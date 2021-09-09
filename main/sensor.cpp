@@ -22,6 +22,12 @@
 // #include "soc/sens_reg.h" // needed for adc pin reset
 #include "driver/gpio.h"
 #include "canbus.h"
+#include "QMC5883L.h"
+
+I2C_t& i2c_0 = i2c0;  // i2c0 or i2c1
+
+QMC5883L magsens( QMC5883L_ADDR, ODR_50Hz, RANGE_2GAUSS, OSR_512, &i2c_0 );
+
 
 // Sensor board init method. Herein all functions that make the XCVario are launched and tested.
 void sensor(void *args){
@@ -30,7 +36,7 @@ void sensor(void *args){
 	ESP_LOGI( FNAME, "Log level set globally to INFO %d",  ESP_LOG_INFO);
 	esp_chip_info_t chip_info;
 	esp_chip_info(&chip_info);
-	ESP_LOGI( FNAME,"This is ESP32 chip with %d CPU cores, WiFi%s%s, ",
+	ESP_LOGI( FNAME,"This is ESP32 chip with %d CPU core(s), WiFi%s%s, ",
 			chip_info.cores,
 			(chip_info.features & CHIP_FEATURE_BT) ? "/BT" : "",
 					(chip_info.features & CHIP_FEATURE_BLE) ? "/BLE" : "");
@@ -45,10 +51,29 @@ void sensor(void *args){
 	ESP_LOGI(FNAME,"Program Version %s", myVersion.version() );
 	ESP_LOGI(FNAME,"Wireless ID %s", SetupCommon::getID() );
 
+	ESP_LOGI(FNAME,"Now start CAN bus selftest" );
 	if( CANbus::selfTest() ){
 		CANbus::begin();
-	}
+	}else
+		ESP_LOGE(FNAME,"CAN bus selftest failed" );
+	ESP_LOGI(FNAME,"CAN bus selftest end" );
 
+	if( magsens.begin(GPIO_NUM_5, GPIO_NUM_4, 400000 ) ){
+		if( !magsens.selfTest() ){
+			ESP_LOGW(FNAME,"Magnetic sensor selftest failed");
+		}
+	}else
+		ESP_LOGW(FNAME,"Magnetic sensor init failed");
+
+	while( 1 ){
+		delay( 50 );
+		int x,y,z;
+		if( magsens.rawHeading( x,y,z) )
+			ESP_LOGI(FNAME,"X=%d, Y=%d Z=%d", x, y, z );
+		else
+			ESP_LOGW(FNAME,"Magnetic sensor read failed");
+
+	}
 }
 
 extern "C" void  app_main(void){

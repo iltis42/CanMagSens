@@ -64,11 +64,10 @@ public:
 	  return m_sensor;
 	}
 
-	/** Set the I2C bus used for the connection. */
-	void setBus( I2C_t *theBus ) { m_bus = theBus; }
+	bool begin( gpio_num_t sda, gpio_num_t scl, int i2c_clock );
 
 	/** Check for reply with I2C bus address */
-	esp_err_t selfTest();
+	bool selfTest();
 
 	/**
 	 * Configure the device with the set parameters and set the mode to continuous.
@@ -76,8 +75,7 @@ public:
 	 * you max give output datarate (odr) and oversampling rate (osr)
 	 * if not given defaults are as from constructor
 	 */
-	esp_err_t initialize( int a_odr=0, int a_osr=0 );
-
+	bool initialize();
 
 	/**
 	 * Read temperature in degree Celsius. Ok is set to true,
@@ -89,35 +87,7 @@ public:
 	 * Read out the registers X, Y, Z (0...5) in raw format.
 	 * Returns true in case of success otherwise false.
 	 */
-	bool rawHeading();
-
-	/**
-	 * Calibrate compass by using the read x, y, z raw values. The calibration is
-	 * stopped by the reporter function which displays intermediate results of the
-	 * calibration action.
-	 */
-	bool calibrate( bool (*reporter)( float xc, float yc, float zc,float xs, float ys, float zs, float xbias, float ybias, float zbias ) );
-
-	/**
-	 * Resets the whole compass calibration, also the saved configuration.
-	 */
-	void resetCalibration();
-
-	/**
-	 * Saves a done compass calibration.
-	 */
-	void saveCalibration();
-
-	/**
-	 * Loads a stored compass calibration. Returns true, if valid calibration
-	 * data could be loaded, otherwise false.
-	 */
-	bool loadCalibration();
-
-	/** Write with data part. */
-	esp_err_t writeRegister( const uint8_t addr,
-			const uint8_t reg,
-			const uint8_t value );
+	bool rawHeading( int &xout, int &yout, int &zout);
 
 	/**
 	 * Return the overflow status flag. It is set to true, if any data of three
@@ -128,13 +98,6 @@ public:
 	  return overflowWarning;
 	}
 
-	/**
-	 * Return the calibration flag. Set to true, if a calibration is running.
-	 */
-	static bool calibrationIsRunning()
-	{
-	  return calibrationRunning;
-	}
 
 	int getReadError(){ return totalReadErrors; };
 
@@ -142,10 +105,9 @@ public:
 	 * Read bytes from the chip.
 	 * Return the number of read bytes or 0 in error case.
 	 */
-	uint8_t readRegister( const uint8_t addr,
-			const uint8_t reg,
-			const uint8_t count,
-			uint8_t *data );
+	uint8_t readRegister( const uint8_t addr, const uint8_t reg, const uint8_t count, uint8_t *data );
+
+	esp_err_t writeRegister( const uint8_t addr, const uint8_t reg,	const uint8_t value );
 
 private:
 
@@ -159,32 +121,11 @@ private:
 	  return ( tv.tv_sec * 1000 ) + ( tv.tv_usec / 1000 );
 	}
 
-  /**
-   * Resets the class calibration variables.
-   */
-  void resetClassCalibration();
-
-	/** Check, if the bus pointer is valid. */
-	inline bool checkBus()
-	{
-		if( m_bus == nullptr )	{
-			// ESP_LOGE( FNAME, "QMC5883L bus pointer is zero" );
-			return false;
-		}
-		return true;
-	}
 
 	static bool m_sensor;
-	I2C_t* m_bus;
+	I2C_t* i2c_bus;
 
-	/** Variables used by calibration. */
-	float xbias, ybias, zbias;
-	float xscale, yscale, zscale;
-	int16_t xmax, xmin;
-	int16_t ymax, ymin;
-	int16_t zmax, zmin;
-
-	/** Read raw values from the chip */
+	/** Read raw values from the chip averaged */
 	int xraw, yraw, zraw;
 
 	uint8_t addr; // chip adress
@@ -193,8 +134,6 @@ private:
 	uint8_t osr; // over sample ratio
 	static bool overflowWarning;
 	static int errors;
-	static bool calibrationRunning;
-	static float _heading;
 	static int   totalReadErrors;
 	static Average<20> filterX;
 	static Average<20> filterY;

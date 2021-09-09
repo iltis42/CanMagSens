@@ -31,10 +31,10 @@ TaskHandle_t *cpid;
 
 // install/reinstall CAN driver in corresponding mode
 void CANbus::driverInstall( twai_mode_t mode, bool reinstall ){
-	// if( reinstall ){
-	twai_stop();
-	twai_driver_uninstall();
-	// }
+	if( reinstall ){
+		twai_stop();
+		twai_driver_uninstall();
+	}
 	twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT( _tx_io, _rx_io, mode );
 	twai_timing_config_t  t_config = TWAI_TIMING_CONFIG_1MBITS();
 	twai_filter_config_t  f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
@@ -147,8 +147,8 @@ void CANbus::tick(){
 	}
 	if( !(_tick%4) )
 		Router::routeCAN();
-	if( !(_tick%50) )
-		sendData( 0x11, msg.c_str(), 1 ); // keep alive
+	// if( !(_tick%50) )
+	//	sendData( 0x11, msg.c_str(), 1 ); // keep alive
 }
 
 
@@ -185,9 +185,11 @@ bool CANbus::sendNMEA( const char *msg ){
 
 bool CANbus::selfTest(){
 	ESP_LOGI(FNAME,"CAN bus selftest");
+
 	can_ready = true;
 	driverInstall( TWAI_MODE_NO_ACK );
-	delay(1000);
+	delay(100);
+
 	bool res=false;
 	int id=0x100;
 	for( int i=0; i<10; i++ ){
@@ -208,7 +210,6 @@ bool CANbus::selfTest(){
 			delay(10*i);
 		}
 		else if( memcmp( msg ,tx, len ) == 0 ){
-			ESP_LOGW(FNAME,"+++ CAN bus selftest TX/RX OKAY +++");
 			res=true;
 			break;
 		}
@@ -224,9 +225,9 @@ bool CANbus::selfTest(){
 }
 
 bool CANbus::sendData( int id, const char* msg, int length, int self ){
-	// ESP_LOGI(FNAME,"CANbus::send %d bytes, msg %s, self %d", length, msg, self );
+	ESP_LOGI(FNAME,"CANbus::send %d bytes, msg %s, self %d", length, msg, self );
 	if( !can_ready ){
-		// ESP_LOGI(FNAME,"CANbus not ready, abort");
+		ESP_LOGI(FNAME,"CANbus not ready, abort");
 		return false;
 	}
 
@@ -242,13 +243,13 @@ bool CANbus::sendData( int id, const char* msg, int length, int self ){
 	// ESP_LOGI(FNAME,"TX CAN bus message id:%04x, bytes:%d, data:%s, self:%d", message.identifier, message.data_length_code, message.data, message.self );
 
 	//Queue message for transmission
-	esp_err_t error = twai_transmit(&message, pdMS_TO_TICKS(10));
+	esp_err_t error = twai_transmit(&message, pdMS_TO_TICKS(100));
 	if(error == ESP_OK){
-		// ESP_LOGI(FNAME,"Send CAN bus message okay");
+		ESP_LOGI(FNAME,"Send CAN bus message okay");
 		return true;
 	}
 	else{
-		// ESP_LOGI(FNAME,"Send CAN bus message failed, ret:%02x", error );
+		ESP_LOGI(FNAME,"Send CAN bus message failed, ret:%02x", error );
 		return false;
 	}
 }
