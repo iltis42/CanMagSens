@@ -1,22 +1,21 @@
-# Hello World Example
+# CAN Bus MagnetSensor for XCVario
 
-Starts a FreeRTOS task to print "Hello World".
+Read Magnetsensor via I2C and send X,Y,Z raw data of 3D Hall sensors via CAN bus protocol to XCVario
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
 
-## How to use example
+## How to use
 
-Follow detailed instructions provided specifically for this example. 
+Follow detailed instructions provided specifically for an ESP32-C3 example project:
 
 Select the instructions depending on Espressif chip installed on your development board:
 
 - [ESP32 Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/stable/get-started/index.html)
-- [ESP32-S2 Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s2/get-started/index.html)
+- [ESP32-C3 Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/index.html)
 
 
-## Example folder contents
+## folder contents
 
-The project **hello_world** contains one source file in C language [hello_world_main.c](main/hello_world_main.c). The file is located in folder [main](main).
+The project **CanMagSens** contains one source files in C++ language. The files are located in folder [main](main).
 
 ESP-IDF projects are built using CMake. The project build configuration is contained in `CMakeLists.txt` files that provide set of directives and instructions describing the project's source files and targets (executable, library, or both). 
 
@@ -24,11 +23,10 @@ Below is short explanation of remaining files in the project folder.
 
 ```
 ├── CMakeLists.txt
-├── example_test.py            Python script used for automated example testing
 ├── main
 │   ├── CMakeLists.txt
 │   ├── component.mk           Component make file
-│   └── hello_world_main.c
+│   └── *.cpp
 ├── Makefile                   Makefile used by legacy GNU Make
 └── README.md                  This is the file you are currently reading
 ```
