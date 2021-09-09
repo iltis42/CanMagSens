@@ -87,7 +87,7 @@ public:
 	 * Read out the registers X, Y, Z (0...5) in raw format.
 	 * Returns true in case of success otherwise false.
 	 */
-	bool rawHeading( int &xout, int &yout, int &zout);
+	bool rawHeading( int16_t &xout, int16_t &yout, int16_t &zout);
 
 	/**
 	 * Return the overflow status flag. It is set to true, if any data of three

@@ -27,7 +27,7 @@
 I2C_t& i2c_0 = i2c0;  // i2c0 or i2c1
 
 QMC5883L magsens( QMC5883L_ADDR, ODR_50Hz, RANGE_2GAUSS, OSR_512, &i2c_0 );
-
+static int msgsent = 0;
 
 // Sensor board init method. Herein all functions that make the XCVario are launched and tested.
 void sensor(void *args){
@@ -67,9 +67,22 @@ void sensor(void *args){
 
 	while( 1 ){
 		delay( 50 );
-		int x,y,z;
-		if( magsens.rawHeading( x,y,z) )
-			ESP_LOGI(FNAME,"X=%d, Y=%d Z=%d", x, y, z );
+		int16_t x,y,z;
+		if( magsens.rawHeading( x,y,z) ){
+			// ESP_LOGI(FNAME,"X=%d, Y=%d Z=%d", x, y, z );
+			char data[6];
+			data[0] = x & 0xFF;
+			data[1] = (x & 0xFF00) >> 8;
+			data[2] = y & 0xFF;
+			data[3] = (y & 0xFF00) >> 8;
+			data[4] = z & 0xFF;
+			data[5] = ( z & 0xFF00 ) >> 8;
+			if( CANbus::sendData( 0x031, data, 6 ) ){
+				msgsent++;
+				if( !(msgsent%200) )
+					ESP_LOGI(FNAME,"CAN bus msg sent ok = %d", msgsent );
+			}
+		}
 		else
 			ESP_LOGW(FNAME,"Magnetic sensor read failed");
 

@@ -35,6 +35,7 @@ void CANbus::driverInstall( twai_mode_t mode, bool reinstall ){
 		twai_stop();
 		twai_driver_uninstall();
 	}
+	delay( 100 );
 	twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT( _tx_io, _rx_io, mode );
 	twai_timing_config_t  t_config = TWAI_TIMING_CONFIG_1MBITS();
 	twai_filter_config_t  f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
@@ -189,7 +190,6 @@ bool CANbus::selfTest(){
 	can_ready = true;
 	driverInstall( TWAI_MODE_NO_ACK );
 	delay(100);
-
 	bool res=false;
 	int id=0x100;
 	for( int i=0; i<10; i++ ){
@@ -202,7 +202,7 @@ bool CANbus::selfTest(){
 		}
 		char msg[12];
 		int rxid;
-		delay(1);
+		delay(10);
 		int bytes = receive( &rxid, msg, 5 );
 		// ESP_LOGI(FNAME,"RX CAN bus message bytes:%d, id:%04x, data:%s", bytes, id, msg );
 		if( bytes == 0 || rxid != id ){
@@ -225,7 +225,9 @@ bool CANbus::selfTest(){
 }
 
 bool CANbus::sendData( int id, const char* msg, int length, int self ){
-	ESP_LOGI(FNAME,"CANbus::send %d bytes, msg %s, self %d", length, msg, self );
+	// ESP_LOGI(FNAME,"CANbus::send %d bytes, self %d", length, self );
+	// ESP_LOG_BUFFER_HEXDUMP(FNAME,msg,length, ESP_LOG_INFO);
+
 	if( !can_ready ){
 		ESP_LOGI(FNAME,"CANbus not ready, abort");
 		return false;
@@ -243,9 +245,10 @@ bool CANbus::sendData( int id, const char* msg, int length, int self ){
 	// ESP_LOGI(FNAME,"TX CAN bus message id:%04x, bytes:%d, data:%s, self:%d", message.identifier, message.data_length_code, message.data, message.self );
 
 	//Queue message for transmission
+	delay(1);
 	esp_err_t error = twai_transmit(&message, pdMS_TO_TICKS(100));
 	if(error == ESP_OK){
-		ESP_LOGI(FNAME,"Send CAN bus message okay");
+		// ESP_LOGI(FNAME,"Send CAN bus message okay");
 		return true;
 	}
 	else{

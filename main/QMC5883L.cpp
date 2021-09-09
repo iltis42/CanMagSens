@@ -16,8 +16,9 @@ https://datasheetspdf.com/pdf-file/1309218/QST/QMC5883L/1
 File: QMC5883L.cpp
 
 Author: Axel Pauli, January 2021
+Adaptions for standalone CAN sensor Eckhard Völlm
 
-Last update: 2021-04-05
+Last update: 2021-09-09
 
  ***************************************************************************/
 
@@ -84,13 +85,11 @@ QMC5883L::QMC5883L( const uint8_t addrIn,
 		I2C_t *i2cBus ) : i2c_bus( i2cBus ), addr( addrIn ), odr( odrIn ), range( rangeIn ), osr( osrIn )
 {
 	ESP_LOGI( FNAME, "QMC5883L( %02X )", addrIn );
-
 	if( addrIn == 0 )
 	{
 		// set address to default value of chip, if it is zero.
 		addr = QMC5883L_ADDR;
 	}
-
 	overflowWarning = false;
 }
 
@@ -102,7 +101,6 @@ QMC5883L::~QMC5883L()
 esp_err_t QMC5883L::writeRegister( const uint8_t addr,	const uint8_t reg,	const uint8_t value )
 {
 	esp_err_t err = i2c_bus->writeByte( addr, reg, value );
-
 	if( err != ESP_OK )	{
 		// ESP_LOGE( FNAME, "QMC5883L writeRegister( 0x%02X, 0x%02X, 0x%02X ) FAILED",	addr, reg, value );
 		return ESP_FAIL;
@@ -225,7 +223,7 @@ bool QMC5883L::begin( gpio_num_t sda, gpio_num_t scl, int i2c_clock ){
 }
 
 
-bool QMC5883L::rawHeading( int &xout, int &yout, int &zout )
+bool QMC5883L::rawHeading( int16_t &xout, int16_t &yout, int16_t &zout )
 {
 	uint8_t data[6];
 	uint8_t status = 0;
@@ -280,9 +278,9 @@ bool QMC5883L::rawHeading( int &xout, int &yout, int &zout )
 		xraw = filterX( x );
 		yraw = filterY( y );
 		zraw = filterZ( z );
-		xout = xraw;
-		yout = yraw;
-		zout = zraw;
+		xout = (int16_t)xraw;
+		yout = (int16_t)yraw;
+		zout = (int16_t)zraw;
 		// ESP_LOGI( FNAME, "X:%d Y:%d Z:%d  RDY:%d DOR:%d", xraw, yraw,zraw, status & STATUS_DRDY, status & STATUS_DOR );
 		return true;
 	}
