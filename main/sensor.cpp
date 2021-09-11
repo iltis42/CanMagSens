@@ -79,8 +79,10 @@ void sensor(void *args){
 			data[5] = ( z & 0xFF00 ) >> 8;
 			if( CANbus::sendData( 0x031, data, 6 ) ){
 				msgsent++;
-				if( !(msgsent%200) )
-					ESP_LOGI(FNAME,"CAN bus msg sent ok = %d", msgsent );
+				if( !(msgsent%200) ){
+					ESP_LOGI(FNAME,"CAN bus msg sent ok = %d X=%d Y=%d Z=%d", msgsent, x, y, z );
+					ESP_LOG_BUFFER_HEXDUMP(FNAME,data,6, ESP_LOG_INFO);
+				}
 			}
 		}
 		else
