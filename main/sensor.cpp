@@ -23,7 +23,10 @@
 #include "driver/gpio.h"
 #include "canbus.h"
 #include "QMC5883L.h"
+#include "esp_task_wdt.h"
 
+extern TaskHandle_t pxCurrentTCB;
+TaskHandle_t tpid;
 I2C_t& i2c_0 = i2c0;  // i2c0 or i2c1
 
 QMC5883L magsens( QMC5883L_ADDR, ODR_50Hz, RANGE_2GAUSS, OSR_512, &i2c_0 );
@@ -65,6 +68,10 @@ void sensor(void *args){
 	}else
 		ESP_LOGW(FNAME,"Magnetic sensor init failed");
 
+	esp_err_t ret = esp_task_wdt_add(tpid);
+	if( ret != ESP_OK )
+		ESP_LOGE(FNAME,"WDT add task failed %X", ret );
+
 	while( 1 ){
 		delay( 50 );
 		int16_t x,y,z;
@@ -79,6 +86,9 @@ void sensor(void *args){
 			data[5] = ( z & 0xFF00 ) >> 8;
 			if( CANbus::sendData( 0x031, data, 6 ) ){
 				msgsent++;
+				esp_err_t ret = esp_task_wdt_reset();
+				if( ret != ESP_OK )
+					ESP_LOGE(FNAME,"WDT reset failed %X", ret );
 				if( !(msgsent%200) ){
 					ESP_LOGI(FNAME,"CAN bus msg sent ok = %d X=%d Y=%d Z=%d", msgsent, x, y, z );
 					ESP_LOG_BUFFER_HEXDUMP(FNAME,data,6, ESP_LOG_INFO);
@@ -91,13 +101,14 @@ void sensor(void *args){
 	}
 }
 
+
 extern "C" void  app_main(void){
 	ESP_LOGI(FNAME,"app_main" );
 	ESP_LOGI(FNAME,"Now init all Setup elements");
 	bool setupPresent;
 	SetupCommon::initSetup( setupPresent );
 	esp_log_level_set("*", ESP_LOG_INFO);
-	sensor( 0 );
+	xTaskCreate(&sensor, "sensor", 4096, NULL, 14, &tpid );
 	vTaskDelete( NULL );
 }
 
