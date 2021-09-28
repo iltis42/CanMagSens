@@ -1,13 +1,21 @@
-#include "driver/gpio.h"
-#include "logdef.h"
+
 #include "canbus.h"
-#include "string.h"
-#include "esp_err.h"
+#include "SetupNG.h"
+
 #include "sensor.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "RingBufCPP.h"
 #include "Router.h"
+#include "QMC5883L.h"
+
+
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
+#include "driver/gpio.h"
+#include "esp_log.h"
+#include "esp_err.h"
+
+#include <cstring>
 
 
 /*
@@ -18,28 +26,48 @@
  */
 
 int CANbus::_tick = 0;
-bool CANbus::can_ready = false;
+volatile bool CANbus::_ready_initialized = false;
 gpio_num_t CANbus::_tx_io = CAN_BUS_TX_PIN;
 gpio_num_t CANbus::_rx_io = CAN_BUS_RX_PIN;
 bool       CANbus::_connected;
 int        CANbus::_connected_timeout;
 
-TaskHandle_t *cpid;
+static TaskHandle_t cpid;
+static bool force_reconnect = false;
 
 #define MSG_ID 0x555
 
 
 // install/reinstall CAN driver in corresponding mode
-void CANbus::driverInstall( twai_mode_t mode, bool reinstall ){
-	if( reinstall ){
-		twai_stop();
-		twai_driver_uninstall();
+void CANbus::driverInstall( twai_mode_t mode, bool other_speed ){
+	if( _ready_initialized ){
+        driverUninstall();
 	}
-	delay( 100 );
 	twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT( _tx_io, _rx_io, mode );
-	twai_timing_config_t  t_config = TWAI_TIMING_CONFIG_1MBITS();
-	twai_filter_config_t  f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
+	twai_timing_config_t t_config;
+    int speed = can_speed.get();
+    if ( other_speed ) {
+        speed = (speed+1)%CAN_SPEED_MAX;
+        can_speed.set(speed, false);
+    }
+	if( speed == CAN_SPEED_250KBIT ){
+		ESP_LOGI(FNAME,"CAN rate 250KBit");
+		t_config = TWAI_TIMING_CONFIG_250KBITS();
+	}
+	else if( speed == CAN_SPEED_500KBIT ){
+		ESP_LOGI(FNAME,"CAN rate 500KBit");
+		t_config = TWAI_TIMING_CONFIG_500KBITS();
+	}
+	else if( speed == CAN_SPEED_1MBIT ){
+		ESP_LOGI(FNAME,"CAN rate 1MBit");
+		t_config = TWAI_TIMING_CONFIG_1MBITS();
+	}
+	else{
+		ESP_LOGI(FNAME,"CAN rate 1MBit for selftest");
+		t_config = TWAI_TIMING_CONFIG_1MBITS();
+	}
 
+	twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
     //Install TWAI driver
 	if (twai_driver_install(&g_config, &t_config, &f_config) == ESP_OK) {
 		ESP_LOGI(FNAME,"Driver installed OK, mode %d", mode );
@@ -47,49 +75,62 @@ void CANbus::driverInstall( twai_mode_t mode, bool reinstall ){
 		ESP_LOGI(FNAME,"Failed to install driver");
 		return;
 	}
+	delay(50);
 	//Start TWAI driver
 	if (twai_start() == ESP_OK) {
 		ESP_LOGI(FNAME,"Driver started");
+        delay(100);
+        _ready_initialized = true;
 	} else {
+        twai_driver_uninstall();
 		ESP_LOGI(FNAME,"Failed to start driver");
-		return;
 	}
 }
 
+void CANbus::driverUninstall(){
+    if( _ready_initialized ){
+        _ready_initialized = false;
+		twai_stop();
+		delay(10);
+		twai_driver_uninstall();
+		delay(50);
+	}
+}
 
 void canTask(void *pvParameters){
-	while (1) {
-		CANbus::tick();
+	while (true) {
+		if ( CANbus::tick() ) {
+    		delay(500);
+        }
 		if( (CANbus::_tick % 100) == 0) {
 			// ESP_LOGI(FNAME,"Free Heap: %d bytes", heap_caps_get_free_size(MALLOC_CAP_8BIT) );
 			if( uxTaskGetStackHighWaterMark( cpid ) < 128 )
 				ESP_LOGW(FNAME,"Warning canbus task stack low: %d bytes", uxTaskGetStackHighWaterMark( cpid ) );
 		}
+        delay(50);
 	}
 }
+
 
 // begin CANbus, start selfTest and launch driver in normal (bidir) mode afterwards
 void CANbus::begin()
 {
     //Initialize configuration structures using macro initializers
 	ESP_LOGI(FNAME,"CANbus::begin");
-    delay(100);
-    driverInstall( TWAI_MODE_NORMAL, true );
-    xTaskCreatePinnedToCore(&canTask, "canTask", 4096, NULL, 8, cpid, 0);
+	driverInstall( TWAI_MODE_NORMAL );
+
+	xTaskCreatePinnedToCore(&canTask, "canTask", 4096, nullptr, 8, &cpid, 0);
+
 }
 
-
 // receive message of corresponding ID
-SString nmea;
-
-int CANbus::receive( int *id, char *msg, int timeout ){
+int CANbus::receive( int *id, SString& msg, int timeout ){
 	twai_message_t rx;
 	esp_err_t ret = twai_receive(&rx, pdMS_TO_TICKS(timeout) );
 	// ESP_LOGI(FNAME,"RX CAN bus message ret=%02x", ret );
 	if(ret == ESP_OK ){
 		if( rx.data_length_code > 0 && rx.data_length_code <= 8 ){
-			memcpy( msg,rx.data, rx.data_length_code );
-			msg[rx.data_length_code] = 0;
+            msg.append((const char*)rx.data, rx.data_length_code);
 			// ESP_LOGI(FNAME,"RX CAN bus message ret=(%02x), id:%04x bytes:%d, data:%s", ret, rx.identifier, rx.data_length_code, msg );
 			*id = rx.identifier;
 			return rx.data_length_code;
@@ -98,21 +139,26 @@ int CANbus::receive( int *id, char *msg, int timeout ){
 	return 0;
 }
 
-int rx_pos=0;
 // hook this into another task to save memory
-void CANbus::tick(){
+bool CANbus::tick(){
 	_tick++;
-	if( !can_ready ){
-		// ESP_LOGI(FNAME,"CANbus not ready");
-		return;
+	if( force_reconnect ){
+		force_reconnect = false;
+        driverInstall( TWAI_MODE_NORMAL, true );
+        _connected_timeout = 0;
+		return true;
 	}
-	SString msg;
+	if( ! _ready_initialized ){
+		ESP_LOGI(FNAME,"CANbus not ready");
+		return true;
+	}
+	static SString msg;
 	// CAN bus send tick
 	if ( !can_tx_q.isEmpty() ){
 		// ESP_LOGI(FNAME,"There is CAN data");
 		if( _connected ){
-			while( Router::pullMsg( can_tx_q, msg ) ) {
-				// ESP_LOGI(FNAME,"CAN TX len: %d bytes", msg.length() );
+			if( Router::pullMsg( can_tx_q, msg ) ) {
+				ESP_LOGI(FNAME,"CAN TX len: %d bytes", msg.length() );
 				// ESP_LOG_BUFFER_HEXDUMP(FNAME,s.c_str(),s.length(), ESP_LOG_DEBUG);
 				sendNMEA( msg.c_str() );
 			}
@@ -121,43 +167,42 @@ void CANbus::tick(){
 	msg.clear();
 	// Can bus receive tick
 	int id = 0;
-	int bytes = receive( &id, msg.c_str(), 10 );
+	int bytes = receive( &id, msg, 10 );
 	// ESP_LOGI(FNAME,"CAN RX id:%02x, bytes:%d, connected:%d", id, bytes, _connected );
 	if( bytes ){
-		_connected = true;
 		_connected_timeout = 0;
 	}
 	else{
 		_connected_timeout++;
-		if( _connected_timeout > 100 )
-			_connected = false;
 	}
+    // receive message of corresponding ID
+    static SString nmea;
 	if( id == 0x20 ) {     // start of nmea
 		// ESP_LOGI(FNAME,"CAN RX Start of frame");
-		nmea.clear();
-		nmea.append( msg.c_str(), bytes );
+		nmea = msg;
 	}
 	else if( id == 0x21 ){ // segment
 		// ESP_LOGI(FNAME,"CAN RX frame segment");
-		nmea.append( msg.c_str(), bytes );
+		nmea += msg;
 	}
 	else if( id == 0x22 ){
-		nmea.append( msg.c_str(), bytes );
+		nmea += msg;
 		// ESP_LOGI(FNAME,"CAN RX, msg: %s", nmea.c_str() );
 		Router::forwardMsg( nmea, can_rx_q );
 	}
-	if( !(_tick%4) )
+	if( !(_tick%4) ) {
 		Router::routeCAN();
-	// if( !(_tick%50) )
-	//	sendData( 0x11, msg.c_str(), 1 ); // keep alive
+    }
+    return _connected;
 }
 
 
 bool CANbus::sendNMEA( const char *msg ){
-	if( !can_ready )
+	if( !_ready_initialized ){
 		return false;
+    }
 	int len=strlen(msg);
-	// ESP_LOGI(FNAME,"send CAN NMEA len %d, msg: %s", len, msg );
+	ESP_LOGI(FNAME,"send CAN NMEA len %d, msg: %s", len, msg );
 	bool ret = true;
 	int id = 0x20;
 	int dlen=8;
@@ -186,10 +231,7 @@ bool CANbus::sendNMEA( const char *msg ){
 
 bool CANbus::selfTest(){
 	ESP_LOGI(FNAME,"CAN bus selftest");
-
-	can_ready = true;
 	driverInstall( TWAI_MODE_NO_ACK );
-	delay(100);
 	bool res=false;
 	int id=0x100;
 	for( int i=0; i<10; i++ ){
@@ -200,36 +242,46 @@ bool CANbus::selfTest(){
 		if( !sendData( id, tx,len, 1 ) ){
 			ESP_LOGW(FNAME,"CAN bus selftest TX FAILED");
 		}
-		char msg[12];
+		SString msg;
 		int rxid;
 		delay(10);
-		int bytes = receive( &rxid, msg, 5 );
-		// ESP_LOGI(FNAME,"RX CAN bus message bytes:%d, id:%04x, data:%s", bytes, id, msg );
+		int bytes = receive( &rxid, msg );
+		ESP_LOGI(FNAME,"RX CAN bus message bytes:%d, id:%04x, data:%s", bytes, id, msg.c_str() );
 		if( bytes == 0 || rxid != id ){
-			ESP_LOGW(FNAME,"CAN bus selftest RX call FAILED bytes=%d rxid=%04x", bytes, rxid );
+			ESP_LOGW(FNAME,"CAN bus selftest RX call FAILED");
 			delay(10*i);
 		}
-		else if( memcmp( msg ,tx, len ) == 0 ){
+		else if( memcmp( msg.c_str(), tx, len ) == 0 ){
 			res=true;
 			break;
 		}
 	}
+    driverUninstall();
+
     if( res ){
-    	ESP_LOGI(FNAME,"CAN bus selftest TX/RX OKAY");
-    	return true;
+    	ESP_LOGW(FNAME,"CAN bus selftest TX/RX OKAY");
+        return true;
     }else{
     	ESP_LOGW(FNAME,"CAN bus selftest TX/RX FAILED");
-    	can_ready = false;
+        return false;
     }
-    return false;
 }
 
-bool CANbus::sendData( int id, const char* msg, int length, int self ){
+bool CANbus::sendData( int id, const char* msg, int length, int self )
+{
 	// ESP_LOGI(FNAME,"CANbus::send %d bytes, self %d", length, self );
 	// ESP_LOG_BUFFER_HEXDUMP(FNAME,msg,length, ESP_LOG_INFO);
 
-	if( !can_ready ){
-		ESP_LOGI(FNAME,"CANbus not ready, abort");
+	if( _connected_timeout > 100 ){
+        ESP_LOGI(FNAME,"no CAN connection, reconnecting");
+        force_reconnect = true; // escalate situation
+        _connected_timeout = 0;
+        _connected = false;
+
+		return false;
+	}
+    if( ! _ready_initialized ){
+		// ESP_LOGI(FNAME,"CANbus not ready");
 		return false;
 	}
 
@@ -249,13 +301,18 @@ bool CANbus::sendData( int id, const char* msg, int length, int self ){
 	esp_err_t error = twai_transmit(&message, pdMS_TO_TICKS(100));
 	if(error == ESP_OK){
 		// ESP_LOGI(FNAME,"Send CAN bus message okay");
+        if ( ! _connected ) {
+            // on connect, put used can speed to nvs memory
+            ESP_LOGI(FNAME,"CAN connected, can speed %d saved", can_speed.get());
+            can_speed.set(can_speed.get());
+            _connected = true;
+        }
+        _connected_timeout=0;
 		return true;
 	}
 	else{
 		ESP_LOGI(FNAME,"Send CAN bus message failed, ret:%02x", error );
+        _connected_timeout++;
 		return false;
 	}
 }
-
-
-

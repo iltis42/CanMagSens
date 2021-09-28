@@ -39,8 +39,7 @@ extern "C" {
  *
  */
 
-typedef enum e_can_speed { CAN_SPEED_OFF, CAN_SPEED_250KBIT, CAN_SPEED_500KBIT, CAN_SPEED_1MBIT } e_can_speed_t;  // stored in RAM, FLASH, or into FLASH after a while
-typedef enum e_can_mode { CAN_MODE_MASTER, CAN_MODE_CLIENT } e_can_mode_t;
+typedef enum e_can_speed { CAN_SPEED_250KBIT, CAN_SPEED_500KBIT, CAN_SPEED_1MBIT, CAN_SPEED_MAX } e_can_speed_t;
 typedef enum e_sync { SYNC_NONE, SYNC_FROM_MASTER, SYNC_FROM_CLIENT, SYNC_BIDIR } e_sync_t;
 
 
@@ -114,6 +113,10 @@ public:
 		std::string val( std::to_string( aval ) );
 		if( save )
 			ESP_LOGI( FNAME,"set val: %s", val.c_str() );
+		if( memcmp( &_value, &aval, sizeof( aval )  ) == 0 ){
+			ESP_LOGW(FNAME,"Value already in NVS: %s", val.c_str() );
+			return( true );
+		}
 		_value = T(aval);
 		if( !open() ) {
 			ESP_LOGE(FNAME,"NVS Error open nvs handle !");
@@ -137,7 +140,7 @@ public:
 			ESP_LOGE(FNAME,"NVS error");
 			return false;
 		}
-		ESP_LOGI(FNAME,"NVS commit(key:%s , addr:%08x, len:%d, nvs_handle: %04x)", _key, (unsigned int)(&_value), sizeof( _value ), _nvs_handle);
+		ESP_LOGI(FNAME,"NVS commit(key:%s , addr:%08x, len:%d, nvs handle: %04x)", _key, (unsigned int)(&_value), sizeof( _value ), _nvs_handle);
 		esp_err_t _err = nvs_set_blob(_nvs_handle, _key, (void *)(&_value), sizeof( _value ));
 		sync();
 		if(_err != ESP_OK) {
@@ -276,6 +279,7 @@ extern SetupNG<float>       compass_z_bias;
 extern SetupNG<float>       compass_x_scale;
 extern SetupNG<float>       compass_y_scale;
 extern SetupNG<float>       compass_z_scale;
+extern SetupNG<int>         can_speed;
 
 
 #endif /* MAIN_SETUP_NG_H_ */
