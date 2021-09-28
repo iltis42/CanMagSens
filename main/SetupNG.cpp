@@ -22,8 +22,8 @@
 #include "esp_task_wdt.h"
 #include <logdef.h>
 #include "sensor.h"
-#include <vector> 
-#include "SetupNG.h" 
+#include <vector>
+#include "SetupNG.h"
 
 std::vector<SetupCommon *> SetupCommon::entries;
 char SetupCommon::_ID[14];
@@ -34,6 +34,7 @@ SetupNG<float>          compass_z_bias( "CP_Z_BIAS", 0 );
 SetupNG<float>          compass_x_scale( "CP_X_SCALE", 0 );
 SetupNG<float>          compass_y_scale( "CP_Y_SCALE", 0 );
 SetupNG<float>          compass_z_scale( "CP_Z_SCALE", 0 );
+SetupNG<int>            can_speed( "CANSPEED", CAN_SPEED_1MBIT );
 
 
 SetupCommon * SetupCommon::getMember( const char * key ){
@@ -131,4 +132,3 @@ char * SetupCommon::getID() {
 	}
 	return _ID;
 }
-
