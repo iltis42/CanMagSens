@@ -1,1 +1,1 @@
-idf.py -p /dev/ttyUSB0 flash -b 115200
+idf.py -p /dev/ttyUSB0 flash -b 115200 
