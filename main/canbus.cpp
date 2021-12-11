@@ -311,7 +311,7 @@ bool CANbus::sendData( int id, const char* msg, int length, int self )
 		return true;
 	}
 	else{
-		ESP_LOGI(FNAME,"Send CAN bus message failed, ret:%02x", error );
+		// ESP_LOGI(FNAME,"Send CAN bus message failed, ret:%02x", error );
         _connected_timeout++;
 		return false;
 	}

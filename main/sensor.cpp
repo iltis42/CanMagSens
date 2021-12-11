@@ -4,6 +4,8 @@
 #include "SetupNG.h"
 #include "canbus.h"
 #include "QMC5883L.h"
+#include "QMC6310U.h"
+
 
 // #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
@@ -26,7 +28,8 @@
 
 I2C_t& i2c_0 = i2c0;  // i2c0 or i2c1
 
-QMC5883L magsens( QMC5883L_ADDR, ODR_50Hz, RANGE_2GAUSS, OSR_512, &i2c_0 );
+// QMC5883L magsens( QMC5883L_ADDR, ODR_50Hz, RANGE_2GAUSS, OSR_512, &i2c_0 );
+QMC6310U magsens2( QMC6310U_ADDR, ODR_50Hz, RANGE63_2GAUSS, OSR1_8, OSR2_8, &i2c_0 );
 static int msgsent = 0;
 
 // Sensor board init method. Herein all functions that make the XCVario are launched and tested.
@@ -67,14 +70,23 @@ extern "C" void  app_main(void){
     }
 	ESP_LOGI(FNAME,"CAN bus selftest end" );
 	CANbus::begin();
-
+/*
 	if( magsens.begin(GPIO_NUM_5, GPIO_NUM_4, 400000 ) ){
 		if( !magsens.selfTest() ){
-			ESP_LOGW(FNAME,"Magnetic sensor selftest failed");
+			ESP_LOGW(FNAME,"Magnetic sensor QMC5883 selftest failed");
 		}
 	}else
-		ESP_LOGW(FNAME,"Magnetic sensor init failed");
+		ESP_LOGW(FNAME,"Magnetic sensor QMC5883 init failed");
+ */
+	//  if( magsens2.begin(GPIO_NUM_5, GPIO_NUM_4, 400000 ) ){
 
+
+	if( magsens2.begin(GPIO_NUM_5, GPIO_NUM_4, 400000 ) ){
+		if( !magsens2.selfTest() ){
+			ESP_LOGW(FNAME,"Magnetic sensor QMC6310 selftest failed");
+		}
+	}else
+		ESP_LOGW(FNAME,"Magnetic sensor QMC6310 init failed");
 	esp_err_t ret = esp_task_wdt_add(NULL);
 	if( ret != ESP_OK ) {
 		ESP_LOGE(FNAME,"WDT add task failed %X", ret );
@@ -84,7 +96,7 @@ extern "C" void  app_main(void){
         delay(50);
 
 		int16_t x,y,z;
-		if( magsens.rawHeading( x,y,z) ){
+		if( magsens2.rawHeading( x,y,z) ){
 			// ESP_LOGI(FNAME,"X=%d, Y=%d Z=%d", x, y, z );
 			char data[6];
 			data[0] = x & 0xFF;

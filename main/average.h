@@ -1,4 +1,7 @@
+#pragma once
+
 template <int N, class input_t = int, class sum_t = int>
+
 class Average {
   public:
     input_t operator()(input_t input) {
