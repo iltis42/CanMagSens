@@ -15,7 +15,7 @@ Select the instructions depending on Espressif chip installed on your developmen
 
 ## folder contents
 
-The project **CanMagSens** contains one source files in C++ language. The files are located in folder [main](main).
+The project **CanMagSens** contains only source files in C++ language. The files are located in folder [main](main).
 
 ESP-IDF projects are built using CMake. The project build configuration is contained in `CMakeLists.txt` files that provide set of directives and instructions describing the project's source files and targets (executable, library, or both). 
 
