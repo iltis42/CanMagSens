@@ -1,6 +1,7 @@
 # CAN Bus MagnetSensor for XCVario
 
 Read Magnetsensor via I2C and send X,Y,Z raw data of 3D Hall sensors via CAN bus protocol to XCVario
+Chip support for QMC5883L and on branch qmc6310 also for QMC6310L
 
 
 ## How to use
