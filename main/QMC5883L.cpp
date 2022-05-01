@@ -253,19 +253,6 @@ bool QMC5883L::rawHeading( int16_t &xout, int16_t &yout, int16_t &zout )
 		return false;
 	}
 
-	if( ( status & STATUS_OVL ) == true )
-	{
-		// Magnetic X-Y-Z data overflow has occurred, give out a warning only once
-		if( overflowWarning == false ){
-			ESP_LOGW( FNAME, "read rawHeading detected a X-Y-Z data overflow." );
-			overflowWarning = true;
-			return false;
-		}
-	}
-	// Reset overflow warning, to get a current status of it.
-
-	overflowWarning = false;
-
 	// Precondition already checked in loop before, point only reached if there is RDY or DOR
 	int count = readRegister( addr, REG_X_LSB, 6, data );
 	// Data can be read in every case
@@ -281,7 +268,7 @@ bool QMC5883L::rawHeading( int16_t &xout, int16_t &yout, int16_t &zout )
 		xout = (int16_t)xraw;
 		yout = (int16_t)yraw;
 		zout = (int16_t)zraw;
-		// ESP_LOGI( FNAME, "X:%d Y:%d Z:%d  RDY:%d DOR:%d", xraw, yraw,zraw, status & STATUS_DRDY, status & STATUS_DOR );
+		ESP_LOGI( FNAME, "X:%d Y:%d Z:%d  RDY:%d DOR:%d OVL:%d", xraw, yraw,zraw, status & STATUS_DRDY, status & STATUS_DOR, status & STATUS_OVL );
 		return true;
 	}
 	ESP_LOGE( FNAME, "read Register REG_X_LSB returned count != 6, count: %d", count );

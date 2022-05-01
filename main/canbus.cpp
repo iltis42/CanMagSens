@@ -45,11 +45,8 @@ void CANbus::driverInstall( twai_mode_t mode, bool other_speed ){
 	}
 	twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT( _tx_io, _rx_io, mode );
 	twai_timing_config_t t_config;
-    int speed = can_speed.get();
-    if ( other_speed ) {
-        speed = (speed+1)%CAN_SPEED_MAX;
-        can_speed.set(speed, false);
-    }
+	e_can_speed_t speed = CAN_SPEED_1MBIT;
+
 	if( speed == CAN_SPEED_250KBIT ){
 		ESP_LOGI(FNAME,"CAN rate 250KBit");
 		t_config = TWAI_TIMING_CONFIG_250KBITS();
@@ -304,7 +301,6 @@ bool CANbus::sendData( int id, const char* msg, int length, int self )
         if ( ! _connected ) {
             // on connect, put used can speed to nvs memory
             ESP_LOGI(FNAME,"CAN connected, can speed %d saved", can_speed.get());
-            can_speed.set(can_speed.get());
             _connected = true;
         }
         _connected_timeout=0;

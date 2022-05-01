@@ -96,8 +96,8 @@ extern "C" void  app_main(void){
 			if( CANbus::sendData( 0x031, data, 6 ) ){
 				msgsent++;
 				if( !(msgsent%200) ){
-					ESP_LOGI(FNAME,"CAN bus msg sent ok = %d X=%d Y=%d Z=%d", msgsent, x, y, z );
-					ESP_LOG_BUFFER_HEXDUMP(FNAME,data,6, ESP_LOG_INFO);
+				   ESP_LOGI(FNAME,"CAN bus msg sent ok = %d X=%d Y=%d Z=%d", msgsent, x, y, z );
+				   ESP_LOG_BUFFER_HEXDUMP(FNAME,data,6, ESP_LOG_INFO);
 				}
 			}
 		}
