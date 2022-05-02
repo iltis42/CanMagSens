@@ -271,7 +271,7 @@ bool QMC5883L::rawHeading( int16_t &xout, int16_t &yout, int16_t &zout )
 		xout = (int16_t)xraw;
 		yout = (int16_t)yraw;
 		zout = (int16_t)zraw;
-		// ESP_LOGI( FNAME, "X:%d Y:%d Z:%d  RDY:%d DOR:%d", xraw, yraw,zraw, status & STATUS_DRDY, status & STATUS_DOR );
+		ESP_LOGI( FNAME, "X:%d Y:%d Z:%d  RDY:%d DOR:%d OVL:%d", xraw, yraw,zraw, status & STATUS_DRDY, status & STATUS_DOR, status & STATUS_OVL );
 		return true;
 	}
 	ESP_LOGE( FNAME, "read Register REG_X_LSB returned count != 6, count: %d", count );

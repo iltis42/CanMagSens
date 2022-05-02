@@ -45,11 +45,11 @@ void CANbus::driverInstall( twai_mode_t mode, bool other_speed ){
 	}
 	twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT( _tx_io, _rx_io, mode );
 	twai_timing_config_t t_config;
-    int speed = can_speed.get();
-    if ( other_speed ) {
-        speed = (speed+1)%CAN_SPEED_MAX;
-        can_speed.set(speed, false);
-    }
+        int speed = can_speed.get();
+        if ( other_speed ) {
+           speed = (speed+1)%CAN_SPEED_MAX;
+           can_speed.set(speed, false);
+        }
 	if( speed == CAN_SPEED_250KBIT ){
 		ESP_LOGI(FNAME,"CAN rate 250KBit");
 		t_config = TWAI_TIMING_CONFIG_250KBITS();
@@ -117,7 +117,7 @@ void CANbus::begin()
 {
     //Initialize configuration structures using macro initializers
 	ESP_LOGI(FNAME,"CANbus::begin");
-	driverInstall( TWAI_MODE_NORMAL );
+	driverInstall( TWAI_MODE_NORMAL, false );
 
 	xTaskCreatePinnedToCore(&canTask, "canTask", 4096, nullptr, 8, &cpid, 0);
 
@@ -144,7 +144,7 @@ bool CANbus::tick(){
 	_tick++;
 	if( force_reconnect ){
 		force_reconnect = false;
-        driverInstall( TWAI_MODE_NORMAL, true );
+        driverInstall( TWAI_MODE_NORMAL, false );
         _connected_timeout = 0;
 		return true;
 	}
@@ -231,7 +231,7 @@ bool CANbus::sendNMEA( const char *msg ){
 
 bool CANbus::selfTest(){
 	ESP_LOGI(FNAME,"CAN bus selftest");
-	driverInstall( TWAI_MODE_NO_ACK );
+	driverInstall( TWAI_MODE_NO_ACK, false );
 	bool res=false;
 	int id=0x100;
 	for( int i=0; i<10; i++ ){
