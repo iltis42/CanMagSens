@@ -1,22 +1,36 @@
 #pragma once
 
-template <int N, class input_t = int, class sum_t = int>
+template <int N, typename T=int, typename Total=int >
+class Average
+{
+public:
+	T operator()(T sample)
+	{
+		total += sample;
+		if( full ){
+			T oldest = samples[num_sample];
+			samples[num_sample] = sample;
+			total -= oldest;
+			num_sample++;
+			num_sample = num_sample % N;
+			return (Total)(total / N );
+		}
+		else{
+			samples[num_sample] = sample;
+			num_sample++;
+			if( num_sample == N ){
+				full = true;
+				num_sample = 0;
+				return (Total)(total / N);
+			}else
+				return (Total)(total / num_sample);
+		}
+	}
 
-class Average {
-  public:
-    input_t operator()(input_t input) {
-        sum -= previousInputs[index];
-        sum += input;
-        previousInputs[index] = input;
-        if (++index == N)
-            index = 0;
-        return (sum  / N);
-    }
-
-
-  private:
-    uint8_t index             = 0;
-    input_t previousInputs[N] = {};
-    sum_t sum                 = 0;
+private:
+	T samples[N]{0};
+	uint8_t  num_sample{0};
+	uint8_t  full{false};
+	Total total{0};
 };
 
