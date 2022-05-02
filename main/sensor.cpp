@@ -66,7 +66,7 @@ extern "C" void  app_main(void){
 	ESP_LOGI(FNAME,"CAN bus selftest end" );
 	CANbus::begin();
 
-	if( magsens.begin(GPIO_NUM_5, GPIO_NUM_4, 400000 ) ){
+	if( magsens.begin(GPIO_NUM_5, GPIO_NUM_4, 100000 ) ){
 		if( !magsens.selfTest() ){
 			ESP_LOGW(FNAME,"Magnetic sensor QMC6310 selftest failed");
 		}
