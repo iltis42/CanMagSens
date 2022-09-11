@@ -31,6 +31,13 @@ Below is short explanation of remaining files in the project folder.
 └── README.md                  This is the file you are currently reading
 ```
 
+The follwing procedure shall be okay to build the software when done from scratch:
+
+1) Install esp-idf v4.3 for esp32c3 chip:
+apt install python3.10-venv; mkdir -p ~/esp; cd ~/esp; git clone --recursive https://github.com/espressif/esp-idf.git; cd ~/esp/esp-idf; git checkout release/v4.3; ./install.sh esp32c3; git submodule update --init; alias get_idf='source ~/esp/esp-idf/export.sh';
+2) Build software:
+git clone git@github.com:iltis42/CanMagSens.git; cd CanMagSens/; get_idf; idf.py build
+
 For more information on structure and contents of ESP-IDF projects, please refer to Section [Build System](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/build-system.html) of the ESP-IDF Programming Guide.
 
 ## Troubleshooting
