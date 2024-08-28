@@ -286,9 +286,9 @@ bool QMC6310U::rawHeading( int16_t &xout, int16_t &yout, int16_t &zout )
 		int y = (int)( (int16_t)(( data[3] << 8 ) | data[2]) );
 		int z = -(int)( (int16_t)(( data[5] << 8 ) | data[4]) );
 
-		xraw = filterX( x );
-		yraw = filterY( y );
-		zraw = filterZ( z );
+		xraw =  x;
+		yraw =  y;
+		zraw =  z;
 		xout = (int16_t)xraw;
 		yout = (int16_t)yraw;
 		zout = (int16_t)zraw;
