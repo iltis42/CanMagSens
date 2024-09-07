@@ -68,9 +68,6 @@ bool QMC5883L::overflowWarning = false;
 // Error counter
 int QMC5883L::errors = 0;
 int QMC5883L::totalReadErrors = 0;
-Average<20> QMC5883L::filterX;
-Average<20> QMC5883L::filterY;
-Average<20> QMC5883L::filterZ;
 
 /*
   Creates instance for I2C connection with passing the desired parameters.
@@ -258,17 +255,11 @@ bool QMC5883L::rawHeading( int16_t &xout, int16_t &yout, int16_t &zout )
 	// Data can be read in every case
 	if( count == 6 )
 	{
-		int x = (int)( (int16_t)(( data[1] << 8 ) | data[0]) );
-		int y = (int)( (int16_t)(( data[3] << 8 ) | data[2]) );
-		int z = (int)( (int16_t)(( data[5] << 8 ) | data[4]) );
+		xout = (int)( (int16_t)(( data[1] << 8 ) | data[0]) );
+		yout = (int)( (int16_t)(( data[3] << 8 ) | data[2]) );
+		zout = (int)( (int16_t)(( data[5] << 8 ) | data[4]) );
 
-		xraw =  x;
-		yraw =  y;
-		zraw =  z;
-		xout = (int16_t)xraw;
-		yout = (int16_t)yraw;
-		zout = (int16_t)zraw;
-		ESP_LOGI( FNAME, "X:%d Y:%d Z:%d  RDY:%d DOR:%d OVL:%d", xraw, yraw,zraw, status & STATUS_DRDY, status & STATUS_DOR, status & STATUS_OVL );
+		ESP_LOGI( FNAME, "X:%d Y:%d Z:%d  RDY:%d DOR:%d OVL:%d", xout, yout, zout, status & STATUS_DRDY, status & STATUS_DOR, status & STATUS_OVL );
 		return true;
 	}
 	ESP_LOGE( FNAME, "read Register REG_X_LSB returned count != 6, count: %d", count );

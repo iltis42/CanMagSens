@@ -125,9 +125,6 @@ private:
 	static bool m_sensor;
 	I2C_t* i2c_bus;
 
-	/** Read raw values from the chip averaged */
-	int xraw, yraw, zraw;
-
 	uint8_t addr; // chip adress
 	uint8_t odr;  // output data rate
 	uint8_t range; // magnetic resolution of sensor
@@ -135,7 +132,4 @@ private:
 	static bool overflowWarning;
 	static int errors;
 	static int   totalReadErrors;
-	static Average<20> filterX;
-	static Average<20> filterY;
-	static Average<20> filterZ;
 };

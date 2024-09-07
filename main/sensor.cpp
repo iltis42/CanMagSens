@@ -36,8 +36,8 @@ extern "C" void  app_main(void){
 	bool setupPresent;
 	SetupCommon::initSetup( setupPresent );
 
-	esp_log_level_set("*", ESP_LOG_INFO);
-	ESP_LOGI( FNAME, "Log level set globally to INFO %d",  ESP_LOG_INFO);
+	esp_log_level_set("*", ESP_LOG_WARN);
+	ESP_LOGW( FNAME, "Log level set globally to WARN (%d)", ESP_LOG_WARN);
 
 	esp_wifi_set_mode(WIFI_MODE_NULL);
 
