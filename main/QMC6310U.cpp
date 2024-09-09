@@ -179,7 +179,7 @@ bool QMC6310U::selfTest()
 		return false;
 	}
 	m_sensor = true;
-	ESP_LOGI( FNAME, "QMC6310 selftest chip ID PASSED");
+	ESP_LOGI( FNAME, "QMC6310 selftest chip ID PASSED, chip ID detected: 0x%02X", chipId );
 	return true;
 }
 
