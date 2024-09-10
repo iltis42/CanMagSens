@@ -20,6 +20,7 @@
 #include <esp32/rom/uart.h>
 #include "driver/gpio.h"
 #include "esp_task_wdt.h"
+#include <esp_pm.h>
 
 #include <cstdio>
 #include <cstring>
@@ -46,6 +47,13 @@ extern "C" void  app_main(void){
 	ESP_LOGI( FNAME,"Silicon revision %d, ", chip_info.revision);
 	ESP_LOGI( FNAME,"%dMB %s flash\n", spi_flash_get_chip_size() / (1024 * 1024),
 			(chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
+
+    // Configure power mode
+    esp_pm_config_esp32c3_t pmconf;
+    pmconf.max_freq_mhz = 80;
+    pmconf.min_freq_mhz = 80;
+    pmconf.light_sleep_enable = false;
+    esp_pm_configure(&pmconf);
 
 	NVS.begin();
 	delay( 1000 );
