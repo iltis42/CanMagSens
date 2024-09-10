@@ -9,127 +9,35 @@
 
 I2C driver for the chip QMC5883L, 3-Axis Magnetic Sensor.
 
-QMC5883L data sheet:
-
-https://datasheetspdf.com/pdf-file/1309218/QST/QMC5883L/1
-
 File: QMC5883L.h
 
 Author: Axel Pauli, January 2021
-
-Last update: 2021-03-28
 
  ****************************************************************************/
 
 #pragma once
 
-#include <sys/time.h>
-#include "esp_system.h"
-#include "logdef.h"
-#include "esp_log.h"
-#include "I2Cbus.hpp"
-#include "average.h"
-
-/* The default I2C address of this chip */
-#define QMC5883L_ADDR 0x0D
-
-typedef enum e_oversampling { OSR_512=0, OSR_256=1, OSR_128=2, OSR_64=3 } e_oversampling_t;
-typedef enum e_datarate { ODR_10Hz=0, ODR_50Hz=1, ODR_100Hz=2, ODR_200Hz=3 } e_datarate_t;
-typedef enum e_magn_range { RANGE_2GAUSS=0, RANGE_8GAUSS=1 } e_mag_range_t;
+#include "QMCbase.h"
 
 
-class QMC5883L
+class QMC5883L : public QMCbase
 {
 public:
-	/*
-    Creates instance for I2C connection with passing the desired parameters.
-    No action is done at the bus. Note if i2cBus is not set in the constructor,
-    you have to set it by calling method setBus(). The default address of the
-    chip is 0x0D.
-	 */
-	QMC5883L( const uint8_t addr,
-			      const uint8_t odr,
-			      const uint8_t range,
-			      const uint16_t osr,
-			      I2C_t *i2cBus=nullptr );
-
-	~QMC5883L();
+	enum { OSR_512=0, OSR_256=1, OSR_128=2, OSR_64=3 };
+	enum { RANGE_2GAUSS=0, RANGE_8GAUSS=1 };
 
 	/**
-	 * Returns true, if the self test has been passed successfully, otherwise
-	 * false.
+	Creates instance for I2C connection with passing the desired parameters.
+	No action is done at the bus. Note if i2cBus is not set in the constructor,
+	you have to set it by calling method setBus(). The default address of the
+	chip is 0x0D.
 	 */
-	static bool haveSensor()
-	{
-	  return m_sensor;
-	}
+	QMC5883L( const uint8_t odr, const uint8_t range, const uint16_t osr, I2C_t *i2cBus=nullptr );
+	virtual ~QMC5883L() = default;
 
-	bool begin( gpio_num_t sda, gpio_num_t scl, int i2c_clock );
+	/** Probe for the QMC5883 chip */
+	virtual bool selfTest();
 
-	/** Check for reply with I2C bus address */
-	bool selfTest();
-
-	/**
-	 * Configure the device with the set parameters and set the mode to continuous.
-	 * That means, the device starts working.
-	 * you max give output datarate (odr) and oversampling rate (osr)
-	 * if not given defaults are as from constructor
-	 */
-	bool initialize();
-
-	/**
-	 * Read temperature in degree Celsius. Ok is set to true,
-	 * if temperature data is valid, otherwise it is set to false.
-	 */
-	short temperature( bool *ok );
-
-	/**
-	 * Read out the registers X, Y, Z (0...5) in raw format.
-	 * Returns true in case of success otherwise false.
-	 */
-	bool rawHeading( int16_t &xout, int16_t &yout, int16_t &zout);
-
-	/**
-	 * Return the overflow status flag. It is set to true, if any data of three
-	 * axis magnetic sensor channels is out of range.
-	 */
-	static bool overflowFlag()
-	{
-	  return overflowWarning;
-	}
-
-
-	int getReadError(){ return totalReadErrors; };
-
-	/**
-	 * Read bytes from the chip.
-	 * Return the number of read bytes or 0 in error case.
-	 */
-	uint8_t readRegister( const uint8_t addr, const uint8_t reg, const uint8_t count, uint8_t *data );
-
-	esp_err_t writeRegister( const uint8_t addr, const uint8_t reg,	const uint8_t value );
-
-private:
-
-	/**
-	 * Get time in ms since 1.1.1970
-	 */
-	uint64_t getMsTime()
-	{
-	  struct timeval tv;
-	  gettimeofday( &tv, nullptr );
-	  return ( tv.tv_sec * 1000 ) + ( tv.tv_usec / 1000 );
-	}
-
-
-	static bool m_sensor;
-	I2C_t* i2c_bus;
-
-	uint8_t addr; // chip adress
-	uint8_t odr;  // output data rate
-	uint8_t range; // magnetic resolution of sensor
-	uint8_t osr; // over sample ratio
-	static bool overflowWarning;
-	static int errors;
-	static int   totalReadErrors;
+	/** Configure the chip */
+	virtual bool initialize();
 };
