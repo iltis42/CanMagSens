@@ -21,6 +21,7 @@
 #include "driver/gpio.h"
 #include "esp_task_wdt.h"
 #include <esp_pm.h>
+#include <esp_sleep.h>
 
 #include <cstdio>
 #include <cstring>
@@ -104,9 +105,43 @@ extern "C" void  app_main(void){
 	constexpr esp_log_level_t log_level = ESP_LOG_ERROR;
 	ESP_LOGI( FNAME, "Log level set globally to %d", log_level);
 	esp_log_level_set("*", log_level);
-	while( 1 ){
-        delay(50);
 
+	const uint64_t SENSOR_PERIOD = 100 * 1000; // 100 msec in usec
+	uint64_t sleep_time = SENSOR_PERIOD;
+	uint64_t last_timesys = esp_timer_get_time();
+	while( 1 ){
+		sleep_time = SENSOR_PERIOD - (esp_timer_get_time() - last_timesys);
+		if ( sleep_time > SENSOR_PERIOD ) {
+				sleep_time = SENSOR_PERIOD;
+		}
+		esp_sleep_enable_timer_wakeup(sleep_time);
+		//ESP_LOGI(FNAME,"Sleep for = %lldsec", sleep_time );
+		// uint64_t before_sleep = esp_timer_get_time();
+		esp_err_t err = esp_light_sleep_start();
+		last_timesys = esp_timer_get_time();
+
+		// const char *wakeup_reason;
+		// esp_sleep_wakeup_cause_t wake_cause = esp_sleep_get_wakeup_cause();
+		// switch (wake_cause)
+		// {
+		// case ESP_SLEEP_WAKEUP_EXT0:
+		// 	wakeup_reason = "rtc io";
+		// 	break;
+		// case ESP_SLEEP_WAKEUP_EXT1:
+		// 	wakeup_reason = "rtc ctl";
+		// 	break;
+		// case ESP_SLEEP_WAKEUP_TIMER:
+		// 	wakeup_reason = "timer";
+		// 	break;
+		// case ESP_SLEEP_WAKEUP_GPIO:
+		// 	wakeup_reason = "button";
+		// 	break;
+		// default:
+		// 	wakeup_reason = "other";
+		// 	break;
+		// }
+		// ESP_LOGI(FNAME, "e%d: %s woken, slept for %lldusec.", err, wakeup_reason, last_timesys-before_sleep);
+		
 		int16_t x,y,z;
 		if( magsens->rawHeading( x,y,z) ){
 			// ESP_LOGI(FNAME,"X=%d, Y=%d Z=%d", x, y, z );
