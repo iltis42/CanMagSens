@@ -35,9 +35,6 @@ extern "C" void  app_main(void){
 	bool setupPresent;
 	SetupCommon::initSetup( setupPresent );
 
-	esp_log_level_set("*", ESP_LOG_WARN);
-	ESP_LOGW( FNAME, "Log level set globally to WARN (%d)", ESP_LOG_WARN);
-
 	esp_wifi_set_mode(WIFI_MODE_NULL);
 
 	esp_chip_info_t chip_info;
@@ -95,6 +92,10 @@ extern "C" void  app_main(void){
 		ESP_LOGE(FNAME,"WDT add task failed %X", ret );
     }
 
+	// Reduce logging from now on
+	constexpr esp_log_level_t log_level = ESP_LOG_ERROR;
+	ESP_LOGI( FNAME, "Log level set globally to %d", log_level);
+	esp_log_level_set("*", log_level);
 	while( 1 ){
         delay(50);
 
