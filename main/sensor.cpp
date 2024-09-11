@@ -77,14 +77,14 @@ extern "C" void  app_main(void){
 	QMCbase *magsens;
 	while ( 1 ) {
 		magsens = new QMC5883L( QMCbase::ODR_50Hz, QMC5883L::RANGE_2GAUSS, QMC5883L::OSR_512, &i2c_0 );
-		if( magsens->begin(GPIO_NUM_5, GPIO_NUM_4, 400000 ) ) {
+		if( magsens->begin(GPIO_NUM_5, GPIO_NUM_4, 100000 ) ) {
 			break; // found a QMC5883L
 		}
 		delete magsens;
 
 		// Try the next chip type
 		magsens = new QMC6310U( QMCbase::ODR_50Hz, QMC6310U::RANGE_2GAUSS, QMC6310U::OSR1_8, &i2c_0 );
-		if( magsens->begin(GPIO_NUM_5, GPIO_NUM_4, 400000 ) ) {
+		if( magsens->begin(GPIO_NUM_5, GPIO_NUM_4, 100000 ) ) {
 			break; // found a QMC6310U
 		}
 		delete magsens;
