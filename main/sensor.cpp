@@ -96,10 +96,26 @@ extern "C" void  app_main(void){
 		ESP_LOGW(FNAME,"Magnetic sensor init failed");
 	}
 
+	// Load the nvs stored bias and scale calibration
+	float x_bias = compass_x_bias.get();
+	float y_bias = compass_y_bias.get();
+	float z_bias = compass_z_bias.get();
+	float x_scale = compass_x_scale.get();
+	float y_scale = compass_y_scale.get();
+	float z_scale = compass_z_scale.get();
+	// Check for old scale == 0 default
+	if ( x_scale == 0 || y_scale == 0 || z_scale == 0 ) {
+		x_scale = y_scale = z_scale = 1.f;
+	}
+	// Load the chip specific gain to send data in [µT] on top
+	x_scale *= magsens->getGain();
+	y_scale *= magsens->getGain();
+	z_scale *= magsens->getGain();
+
 	esp_err_t ret = esp_task_wdt_add(NULL);
 	if( ret != ESP_OK ) {
 		ESP_LOGE(FNAME,"WDT add task failed %X", ret );
-    }
+	}
 
 	// Reduce logging from now on
 	constexpr esp_log_level_t log_level = ESP_LOG_ERROR;
