@@ -2,8 +2,8 @@
 #pragma once
 
 #include "RingBufHelpers.h"
-#include "logdef.h"
 #include <cstring>
+#include <algorithm>
 
 #define SSTRLEN 250
 

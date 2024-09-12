@@ -20,7 +20,6 @@ Last update: 2021-09-09
 
 #include "QMCbase.h"
 #include "SetupNG.h"
-#include "sensor.h"
 
 #include <cassert>
 #include <cmath>
@@ -102,7 +101,6 @@ uint8_t QMCbase::readRegister( const uint8_t reg, const uint8_t count, uint8_t *
 				}
 			}
 			// ESP_LOGW( FNAME,"retry #%d reg=%02X err=%d", i, reg, err );
-			delay(2);
 		}
 	}
 	ESP_LOGW( FNAME,"Read after init and retry failed also, return with no data, len=0");
@@ -139,7 +137,6 @@ bool QMCbase::rawHeading( int16_t &xout, int16_t &yout, int16_t &zout )
 			// 	ESP_LOGW( FNAME, "No new data,  STAT=%x", i, status );
 		}
 		// else{
-		// 	delay( 2 );
 		// 	// ESP_LOGW( FNAME, "read REG_STATUS failed, N=%d  RDY%d  DOR%d", i, status & STATUS_DRDY, status & STATUS_DOR );
 		// }
 	}
@@ -190,3 +187,9 @@ int16_t QMCbase::temperature( bool *ok )
 
 int N=0;
 bool holddown=false;
+
+
+float getGain()
+{
+	return microTesla_gain;
+}

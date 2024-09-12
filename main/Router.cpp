@@ -1,16 +1,12 @@
 
-#include <esp_log.h>
-#include <string>
-#include "sdkconfig.h"
-#include <stdio.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_task_wdt.h"
-#include <freertos/semphr.h>
-#include "RingBufCPP.h"
-#include <logdef.h>
-#include "sensor.h"
 #include "Router.h"
+
+#include "RingBufCPP.h"
+
+#include <logdef.h>
+
+#include <string>
+#include <cstdio>
 
 
 RingBufCPP<SString, QUEUE_SIZE> can_rx_q;

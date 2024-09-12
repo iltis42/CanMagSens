@@ -5,35 +5,32 @@
  *      Author: iltis
  */
 
-#include <string>
-#include <stdio.h>
-#include "esp_system.h"
-#include <esp_log.h>
-#include "sdkconfig.h"
-#include <stdio.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+#include "SetupNG.h"
+
 #include "ESP32NVS.h"
 #include "esp32/rom/uart.h"
+#include <esp32/rom/miniz.h>
+
+#include "esp_system.h"
+#include <logdef.h>
+
+#include <string>
+#include <cstdio>
+#include <cmath>
 #include <iostream>
 #include <map>
-#include <math.h>
-#include <esp32/rom/miniz.h>
-#include "esp_task_wdt.h"
-#include <logdef.h>
-#include "sensor.h"
 #include <vector>
-#include "SetupNG.h"
+
 
 std::vector<SetupCommon *> SetupCommon::entries;
 char SetupCommon::_ID[14];
 
-SetupNG<float>          compass_x_bias( "CP_X_BIAS", 0 );
-SetupNG<float>          compass_y_bias( "CP_Y_BIAS", 0 );
-SetupNG<float>          compass_z_bias( "CP_Z_BIAS", 0 );
-SetupNG<float>          compass_x_scale( "CP_X_SCALE", 0 );
-SetupNG<float>          compass_y_scale( "CP_Y_SCALE", 0 );
-SetupNG<float>          compass_z_scale( "CP_Z_SCALE", 0 );
+SetupNG<float>          compass_x_bias( "CP_X_BIAS", 0.f );
+SetupNG<float>          compass_y_bias( "CP_Y_BIAS", 0.f );
+SetupNG<float>          compass_z_bias( "CP_Z_BIAS", 0.f );
+SetupNG<float>          compass_x_scale( "CP_X_SCALE", 1.f );
+SetupNG<float>          compass_y_scale( "CP_Y_SCALE", 1.f );
+SetupNG<float>          compass_z_scale( "CP_Z_SCALE", 1.f );
 SetupNG<int>            can_speed( "CANSPEED", CAN_SPEED_1MBIT );
 
 

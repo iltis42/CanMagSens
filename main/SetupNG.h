@@ -10,21 +10,15 @@
 
 extern "C" {
 #include "esp_partition.h"
-#include "esp_err.h"
-#include "nvs_flash.h"
+// #include "esp_err.h"
+// #include "nvs_flash.h"
 #include "nvs.h"
 }
 
+#include <logdef.h>
 #include <string>
-#include <stdio.h>
-#include "esp_system.h"
-#include "stdio.h"
-#include <esp_log.h>
-#include <string>
-#include "string.h"
-#include <iostream>
+#include <cstdio>
 #include <vector>
-#include "logdef.h"
 
 
 
