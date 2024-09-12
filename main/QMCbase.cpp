@@ -185,11 +185,8 @@ int16_t QMCbase::temperature( bool *ok )
 	return t;
 }
 
-int N=0;
-bool holddown=false;
 
-
-float getGain()
+float QMCbase::getGain()
 {
 	return microTesla_gain;
 }
