@@ -72,6 +72,9 @@ public:
 	uint8_t readRegister( const uint8_t reg, const uint8_t count, uint8_t *data );
 	esp_err_t writeRegister( const uint8_t reg,	const uint8_t value );
 
+	// The factor to multiply on rawHeading readings to get [µT]
+	float getGain();
+
 protected:
 	/** Probe chip Id and check for the proper I2C bus address */
 	virtual bool selfTest() = 0;
@@ -106,4 +109,5 @@ protected:
 	// not used: REG_X_MSB, REG_Y_LSB, REG_Y_MSB, REG_Z_LSB, REG_Z_MSB
 	uint8_t REG_STATUS;        // Status Register.
 	static constexpr uint8_t REG_TEMP_LSB = 7; // Output Data Registers for temperature.
+	float microTesla_gain;
 };

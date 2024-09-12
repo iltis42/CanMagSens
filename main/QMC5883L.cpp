@@ -68,6 +68,14 @@ QMC5883L::QMC5883L( const uint8_t odrIn, const uint8_t rangeIn, const uint16_t o
 	// Set register addresses
 	REG_X_LSB = 0;
 	REG_STATUS = 6;
+
+	// The Gauss range
+	microTesla_gain = 2.f/12000.f;
+	if ( range == RANGE_8GAUSS ) {
+		microTesla_gain = 8.f/3000.f;
+	}
+	// The sensors µT gain (1G = 0.1mT)
+	microTesla_gain = 100.f;
 }
 
 

@@ -73,6 +73,23 @@ QMC6310U::QMC6310U( const uint8_t odrIn, const uint8_t rangeIn, const uint16_t o
 	// Set register addresses
 	REG_X_LSB = 1;
 	REG_STATUS = 9;
+
+	// The Gauss range
+	microTesla_gain = 2.f/15000.f; // case RANGE_2GAUSS:
+	switch ( range ) {
+		case RANGE_8GAUSS:
+			microTesla_gain = 8.f/3750.f;
+			break;
+		case RANGE_12GAUSS:
+			microTesla_gain = 12.f/2500.f;
+			break;
+		case RANGE_30GAUSS:
+			microTesla_gain = 30.f/1000.f;
+			break;
+		default:
+	}
+	// The sensors µT gain (1G = 0.1mT)
+	microTesla_gain *= 100.f;
 }
 
 
