@@ -72,7 +72,7 @@ public:
 	uint8_t readRegister( const uint8_t reg, const uint8_t count, uint8_t *data );
 	esp_err_t writeRegister( const uint8_t reg,	const uint8_t value );
 
-	// The factor to multiply on rawHeading readings to get [µT]
+	// The factor to multiply on rawHeading readings to get [microT]
 	float getGain();
 
 protected:

@@ -87,6 +87,7 @@ QMC6310U::QMC6310U( const uint8_t odrIn, const uint8_t rangeIn, const uint16_t o
 			microTesla_gain = 30.f/1000.f;
 			break;
 		default:
+			break;
 	}
 	// The sensors µT gain (1G = 0.1mT)
 	microTesla_gain *= 100.f;
