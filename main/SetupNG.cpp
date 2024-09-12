@@ -5,25 +5,22 @@
  *      Author: iltis
  */
 
-#include <string>
-#include <stdio.h>
-#include "esp_system.h"
-#include <esp_log.h>
-#include "sdkconfig.h"
-#include <stdio.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+#include "SetupNG.h"
+
 #include "ESP32NVS.h"
 #include "esp32/rom/uart.h"
+#include <esp32/rom/miniz.h>
+
+#include "esp_system.h"
+#include <logdef.h>
+
+#include <string>
+#include <cstdio>
+#include <cmath>
 #include <iostream>
 #include <map>
-#include <math.h>
-#include <esp32/rom/miniz.h>
-#include "esp_task_wdt.h"
-#include <logdef.h>
-#include "sensor.h"
 #include <vector>
-#include "SetupNG.h"
+
 
 std::vector<SetupCommon *> SetupCommon::entries;
 char SetupCommon::_ID[14];

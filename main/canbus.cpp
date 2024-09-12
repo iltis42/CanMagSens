@@ -5,15 +5,14 @@
 #include "sensor.h"
 #include "RingBufCPP.h"
 #include "Router.h"
-#include "QMC5883L.h"
 
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
-#include "driver/gpio.h"
-#include "esp_log.h"
-#include "esp_err.h"
+#include <driver/gpio.h>
+#include <logdef.h>
+#include <esp_err.h>
 
 #include <cstring>
 
