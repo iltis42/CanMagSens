@@ -75,16 +75,16 @@ QMC6310U::QMC6310U( const uint8_t odrIn, const uint8_t rangeIn, const uint16_t o
 	REG_STATUS = 9;
 
 	// The Gauss range
-	microTesla_gain = 2.f/15000.f; // case RANGE_2GAUSS:
+	microTesla_gain = 1.f/15000.f; // case RANGE_2GAUSS:
 	switch ( range ) {
 		case RANGE_8GAUSS:
-			microTesla_gain = 8.f/3750.f;
+			microTesla_gain = 1.f/3750.f;
 			break;
 		case RANGE_12GAUSS:
-			microTesla_gain = 12.f/2500.f;
+			microTesla_gain = 1.f/2500.f;
 			break;
 		case RANGE_30GAUSS:
-			microTesla_gain = 30.f/1000.f;
+			microTesla_gain = 1.f/1000.f;
 			break;
 		default:
 			break;
