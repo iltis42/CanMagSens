@@ -151,9 +151,9 @@ bool QMCbase::rawHeading( int16_t &xout, int16_t &yout, int16_t &zout )
 	// Data can be read in every case
 	if( count == 6 )
 	{
-		xout = (int)( (int16_t)(( data[1] << 8 ) | data[0]) );
-		yout = (int)( (int16_t)(( data[3] << 8 ) | data[2]) );
-		zout = (int)( (int16_t)(( data[5] << 8 ) | data[4]) );
+		xout = (data[1] << 8) | data[0];
+		yout = (data[3] << 8) | data[2];
+		zout = (data[5] << 8) | data[4];
 		xyz_map(xout, yout, zout);
 
 		ESP_LOGI( FNAME, "X:%d Y:%d Z:%d  STAT:%x", xout, yout, zout, status );

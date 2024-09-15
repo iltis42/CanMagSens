@@ -1,12 +1,12 @@
 #ifndef __ESP32NVS_H__
 #define __ESP32NVS_H__
 
-extern "C" {
-#include "esp_partition.h"
-#include "esp_err.h"
-#include "nvs_flash.h"
-#include "nvs.h"
-}
+
+#include <esp_partition.h>
+#include <esp_err.h>
+#include <nvs_flash.h>
+#include <nvs.h>
+
 #include <string>
 
 

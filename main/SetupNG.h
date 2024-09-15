@@ -8,12 +8,7 @@
 #ifndef MAIN_SETUP_NG_H_
 #define MAIN_SETUP_NG_H_
 
-extern "C" {
-#include "esp_partition.h"
-// #include "esp_err.h"
-// #include "nvs_flash.h"
-#include "nvs.h"
-}
+#include <nvs.h>
 
 #include <logdef.h>
 #include <string>
