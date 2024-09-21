@@ -1,7 +1,6 @@
 #pragma once
 
 #include "driver/gpio.h"
-#include "hal/gpio_types.h"
 #include "driver/twai.h"
 
 
@@ -16,9 +15,12 @@ public:
 	~CANbus(){};
 	static void begin();
 	static bool sendData( int id, const char* msg, int length, int self=0 );
-	static bool sendNMEA( const char* msg );
+	static bool sendNMEA( const SString& msg );
 	static int receive(  int *id, SString& msg, int timeout=5);
 	static bool tick();
+
+	static void restart();
+	static void recover();
 	static bool selfTest();
 	static int _tick;
 	static bool connected() { return _connected; };
@@ -32,4 +34,5 @@ private:
 	static gpio_num_t _rx_io;
 	static bool _connected;
 	static int _connected_timeout;
+    static TickType_t _tx_timeout; // [msec] about two times the time for 111 bit to send
 };

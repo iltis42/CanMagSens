@@ -30,6 +30,7 @@ gpio_num_t CANbus::_tx_io = CAN_BUS_TX_PIN;
 gpio_num_t CANbus::_rx_io = CAN_BUS_RX_PIN;
 bool       CANbus::_connected;
 int        CANbus::_connected_timeout;
+TickType_t CANbus::_tx_timeout = 2;
 
 static TaskHandle_t cpid;
 static bool force_reconnect = false;
@@ -43,6 +44,12 @@ void CANbus::driverInstall( twai_mode_t mode, bool other_speed ){
         driverUninstall();
 	}
 	twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT( _tx_io, _rx_io, mode );
+	ESP_LOGI(FNAME, "default alerts %X", g_config.alerts_enabled);
+	g_config.alerts_enabled |= TWAI_ALERT_TX_IDLE | TWAI_ALERT_TX_SUCCESS | TWAI_ALERT_TX_FAILED;
+	g_config.rx_queue_len = 15; // 1.5x the need of one NMEA sentence
+	g_config.tx_queue_len = 15;
+	ESP_LOGI(FNAME, "my alerts %X", g_config.alerts_enabled);
+
 	twai_timing_config_t t_config;
 	e_can_speed_t speed = CAN_SPEED_1MBIT;
 
@@ -71,11 +78,11 @@ void CANbus::driverInstall( twai_mode_t mode, bool other_speed ){
 		ESP_LOGI(FNAME,"Failed to install driver");
 		return;
 	}
-	delay(50);
+
 	//Start TWAI driver
 	if (twai_start() == ESP_OK) {
 		ESP_LOGI(FNAME,"Driver started");
-        delay(100);
+        delay(10);
         _ready_initialized = true;
 	} else {
         twai_driver_uninstall();
@@ -86,10 +93,11 @@ void CANbus::driverInstall( twai_mode_t mode, bool other_speed ){
 void CANbus::driverUninstall(){
     if( _ready_initialized ){
         _ready_initialized = false;
+		delay(100);
 		twai_stop();
-		delay(10);
+		delay(100);
 		twai_driver_uninstall();
-		delay(50);
+		delay(100);
 	}
 }
 
@@ -108,6 +116,24 @@ void canTask(void *pvParameters){
 }
 
 
+void CANbus::restart(){
+	ESP_LOGW(FNAME,"CANbus restart");
+	driverUninstall();
+	driverInstall( TWAI_MODE_NORMAL );
+	_connected_timeout = 0;
+}
+
+void CANbus::recover(){
+	ESP_LOGW(FNAME,"CANbus recover");
+	twai_stop();
+	delay(100);
+	twai_start();
+	delay(100);
+	twai_initiate_recovery();
+	_connected_timeout = 0;
+}
+
+
 // begin CANbus, start selfTest and launch driver in normal (bidir) mode afterwards
 void CANbus::begin()
 {
@@ -120,11 +146,19 @@ void CANbus::begin()
 }
 
 // receive message of corresponding ID
+// return a terminated SString containing exactly the received chars
 int CANbus::receive( int *id, SString& msg, int timeout ){
 	twai_message_t rx;
+
+	uint32_t alerts;
+	twai_read_alerts(&alerts, pdMS_TO_TICKS(_tx_timeout));
+	if( alerts & TWAI_ALERT_RX_QUEUE_FULL )
+		ESP_LOGW(FNAME,"receive: RX QUEUE FULL alert %X", alerts );
+
 	esp_err_t ret = twai_receive(&rx, pdMS_TO_TICKS(timeout) );
-	// ESP_LOGI(FNAME,"RX CAN bus message ret=%02x", ret );
+	// ESP_LOGI(FNAME,"RX CAN bus message ret=%02x len_%d ID:%d dlc:%d ext:%d rtr:%d", ret, rx.data_length_code, rx.identifier, rx.dlc_non_comp, rx.extd, rx.rtr );
 	if(ret == ESP_OK ){
+		// ESP_LOGI(FNAME,"RX CAN bus message ret=%02x TO:%d", ret, _connected_timeout_xcv );
 		if( rx.data_length_code > 0 && rx.data_length_code <= 8 ){
             msg.append((const char*)rx.data, rx.data_length_code);
 			// ESP_LOGI(FNAME,"RX CAN bus message ret=(%02x), id:%04x bytes:%d, data:%s", ret, rx.identifier, rx.data_length_code, msg );
@@ -155,7 +189,7 @@ bool CANbus::tick(){
 		if( _connected ){
 			if( Router::pullMsg( can_tx_q, msg ) ) {
 				ESP_LOGI(FNAME,"CAN TX len: %d bytes", msg.length() );
-				// ESP_LOG_BUFFER_HEXDUMP(FNAME,s.c_str(),s.length(), ESP_LOG_DEBUG);
+				// ESP_LOG_BUFFER_HEXDUMP(FNAME,msg.c_str(),msg.length(), ESP_LOG_DEBUG);
 				sendNMEA( msg.c_str() );
 			}
 		}
@@ -172,19 +206,10 @@ bool CANbus::tick(){
 		_connected_timeout++;
 	}
     // receive message of corresponding ID
-    static SString nmea;
 	if( id == 0x20 ) {     // start of nmea
-		// ESP_LOGI(FNAME,"CAN RX Start of frame");
-		nmea = msg;
-	}
-	else if( id == 0x21 ){ // segment
-		// ESP_LOGI(FNAME,"CAN RX frame segment");
-		nmea += msg;
-	}
-	else if( id == 0x22 ){
-		nmea += msg;
-		// ESP_LOGI(FNAME,"CAN RX, msg: %s", nmea.c_str() );
-		Router::forwardMsg( nmea, can_rx_q );
+		// ESP_LOGI(FNAME,"CAN RX NMEA chunk, len:%d msg: %s", bytes, msg.c_str() );
+		// ESP_LOG_BUFFER_HEXDUMP(FNAME, msg.c_str(), msg.length(), ESP_LOG_INFO);
+		//dlink.process( msg.c_str(), msg.length(), 3 );  // (char *packet, int len, int port );
 	}
 	if( !(_tick%4) ) {
 		Router::routeCAN();
@@ -193,34 +218,38 @@ bool CANbus::tick(){
 }
 
 
-bool CANbus::sendNMEA( const char *msg ){
+bool CANbus::sendNMEA( const SString& msg ){
 	if( !_ready_initialized ){
 		return false;
     }
-	int len=strlen(msg);
+	int len = msg.length();  // Including the terminating \0 -> need to remove this one byte at RX from strlen
 	ESP_LOGI(FNAME,"send CAN NMEA len %d, msg: %s", len, msg );
 	bool ret = true;
+	uint32_t alerts;
+	twai_read_alerts(&alerts, 0); // read and clear alerts
+	if( alerts != 0 ) {
+		ESP_LOGW(FNAME,"Before send alerts %X", alerts);
+    }
+	const int chunk=8;
 	int id = 0x20;
-	int dlen=8;
-	int pos;
-	for( pos=0; pos < len; pos+=8 ){
-		int rest = len - pos;
-		if( !sendData( id, &msg[pos], dlen ) )
+	const char *cptr = msg.c_str();
+	while( len > 0 )
+	{
+		int dlen = std::min(chunk, len);
+		// Underlaying queue does block until there is space,
+		// only a timeout would return false.
+		if( !sendData(id, cptr, dlen) || !ret) {
+			if ( !ret ) {
+				break;
+			}
+			delay(2);
 			ret = false;
-		if( rest > 0 && rest <= 8 ){
-			dlen = rest;
-			break;
-		}else{
-			rest = 0;
 		}
-		// ESP_LOGI(FNAME,"Sent id:%d pos:%d dlen %d", id, pos, dlen );
-		id = 0x21;
+		else {
+			cptr += dlen;
+			len -= dlen;
+		}
 	}
-	id = 0x22;
-	// ESP_LOGI(FNAME,"Sent id:%d pos:%d dlen %d", id, pos, dlen );
-	if( !sendData( id, &msg[pos], dlen ) )
-		ret = false;
-
 	return ret;
 }
 
@@ -230,24 +259,28 @@ bool CANbus::selfTest(){
 	driverInstall( TWAI_MODE_NO_ACK );
 	bool res=false;
 	int id=0x100;
+	delay(100);
+	twai_clear_receive_queue();
 	for( int i=0; i<10; i++ ){
-		char tx[10] = { "18273645" };
+		char tx[10] = { "1827364" };
 		int len = strlen(tx);
 		ESP_LOGI(FNAME,"strlen %d", len );
 		twai_clear_receive_queue();  // there might be data from a remote device
 		if( !sendData( id, tx,len, 1 ) ){
 			ESP_LOGW(FNAME,"CAN bus selftest TX FAILED");
+			recover();
 		}
 		SString msg;
 		int rxid;
-		delay(10);
-		int bytes = receive( &rxid, msg );
+		int bytes = receive( &rxid, msg, 10 );
 		ESP_LOGI(FNAME,"RX CAN bus message bytes:%d, id:%04x, data:%s", bytes, id, msg.c_str() );
-		if( bytes == 0 || rxid != id ){
-			ESP_LOGW(FNAME,"CAN bus selftest RX call FAILED");
-			delay(10*i);
+		if( bytes != 7 || rxid != id ){
+			ESP_LOGW(FNAME,"CAN bus selftest RX call FAILED bytes:%d rxid%d recm:%s", bytes, rxid, msg.c_str() );
+			delay(i);
+			twai_clear_receive_queue();
 		}
 		else if( memcmp( msg.c_str(), tx, len ) == 0 ){
+			ESP_LOGI(FNAME,"RX CAN bus OKAY");
 			res=true;
 			break;
 		}
@@ -277,7 +310,7 @@ bool CANbus::sendData( int id, const char* msg, int length, int self )
 		return false;
 	}
     if( ! _ready_initialized ){
-		// ESP_LOGI(FNAME,"CANbus not ready");
+		ESP_LOGI(FNAME,"CANbus not ready initialized");
 		return false;
 	}
 
