@@ -3,7 +3,7 @@
 #include "SetupNG.h"
 
 #include "sensor.h"
-#include "RingBufCPP.h"
+#include "SString.h"
 #include "Router.h"
 
 

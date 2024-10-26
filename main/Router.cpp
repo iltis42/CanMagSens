@@ -7,6 +7,7 @@
 
 #include <string>
 #include <cstdio>
+#include <freertos/semphr.h>
 
 
 RingBufCPP<SString, QUEUE_SIZE> can_rx_q;
@@ -18,13 +19,18 @@ portMUX_TYPE btmux = portMUX_INITIALIZER_UNLOCKED;
 
 #undef ESP_LOGV
 #define ESP_LOGV(x,y,z);  ;
+static xSemaphoreHandle qMutex=NULL;
+
+void Router::begin(){
+	qMutex = xSemaphoreCreateMutex();
+}
 
 // checks if Queue is full, otherwise appends SString
 bool Router::forwardMsg( SString &s, RingBufCPP<SString, QUEUE_SIZE>& q ){
 	if( !q.isFull() ) {
-		portENTER_CRITICAL_ISR(&btmux);
+		xSemaphoreTake(qMutex,portMAX_DELAY );
 		q.add( s );
-		portEXIT_CRITICAL_ISR(&btmux);
+		xSemaphoreGive(qMutex);
 		return true;
 	}
 	// ESP_LOGW(FNAME,"+++ WARNING +++ dropped msg %s", s.c_str() );
@@ -34,42 +40,26 @@ bool Router::forwardMsg( SString &s, RingBufCPP<SString, QUEUE_SIZE>& q ){
 // gets last message from ringbuffer FIFO
 bool Router::pullMsg( RingBufCPP<SString, QUEUE_SIZE>& q, SString& s ){
 	if( !q.isEmpty() ){
-		portENTER_CRITICAL_ISR(&btmux);
-		q.pull( &s );
-		portEXIT_CRITICAL_ISR(&btmux);
+		xSemaphoreTake(qMutex,portMAX_DELAY );
+		q.pull( s );
+		xSemaphoreGive(qMutex);
 		return true;
 	}
 	return false;
 }
 
-int Router::pullMsg( RingBufCPP<SString, QUEUE_SIZE>& q, char *block ){
-	int size = 0;
-	if( !q.isEmpty() ){
-		SString s;
-		portENTER_CRITICAL_ISR(&btmux);
-		q.pull(  &s );
-		portEXIT_CRITICAL_ISR(&btmux);
-		size = s.length();
-		memcpy( block, s.c_str(), size );
-	}
-	block[size]=0;
-	return size;
-}
-
 int Router::pullBlock( RingBufCPP<SString, QUEUE_SIZE>& q, char *block, int size ){
-	int len = 0;
+	xSemaphoreTake(qMutex,portMAX_DELAY );
+	int total_len = 0;
 	while( !q.isEmpty() ){
-		SString s;
-		portENTER_CRITICAL_ISR(&btmux);
-		q.pull(  &s );
-		portEXIT_CRITICAL_ISR(&btmux);
-		memcpy( block+len, s.c_str(), s.length() );
-		len += s.length();
-		if( (len + SSTRLEN) > size )
+		int len = q.pull( block+total_len );
+		total_len += len;
+		if( (total_len + SSTRLEN) > size )
 			break;
 	}
-	block[len]=0;
-	return len;
+	block[total_len]=0;
+	xSemaphoreGive(qMutex);
+	return total_len;
 }
 
 
@@ -78,8 +68,8 @@ int Router::pullBlock( RingBufCPP<SString, QUEUE_SIZE>& q, char *block, int size
 // route messages from CAN
 void Router::routeCAN(){
 	SString can;
-	if( pullMsg( can_rx_q, can ) ){
- // 		Protocols::parseNMEA( can.c_str() );
+	while( pullMsg( can_rx_q, can ) ){
+ 		;//Protocols::parseNMEA( can.c_str() );
 	}
 }
 

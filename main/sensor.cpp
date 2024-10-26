@@ -2,6 +2,7 @@
 
 #include "Version.h"
 #include "SetupNG.h"
+#include "Router.h"
 #include "canbus.h"
 #include "QMC5883L.h"
 #include "QMC6310U.h"
@@ -62,7 +63,8 @@ extern "C" void  app_main(void){
     esp_pm_configure(&pmconf);
 
 	NVS.begin();
-	delay( 1000 );
+	delay( 10 );
+	Router::begin();
 
 	Version myVersion;
 	ESP_LOGI(FNAME,"Program Version %s", myVersion.version() );

@@ -27,11 +27,11 @@ class Router {
 
 public:
   Router() { };
+  static void begin();
   // add message to queue and return true if succeeded
   static bool forwardMsg( SString &s, RingBufCPP<SString, QUEUE_SIZE>& q );
   // gets last message from ringbuffer FIFO, return true if succeeded
   static bool pullMsg( RingBufCPP<SString, QUEUE_SIZE>& q, SString& s );
-  static int  pullMsg( RingBufCPP<SString, QUEUE_SIZE>& q, char * block );
   // get one big block max 512 byte
   static int pullBlock( RingBufCPP<SString, QUEUE_SIZE>& q, char * block, int size );
   // route messages coming in from CAN interface
