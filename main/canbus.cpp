@@ -107,15 +107,12 @@ void CANbus::driverUninstall(){
 
 void canTask(void *pvParameters){
 	while (true) {
-		if ( CANbus::tick() ) {
-    		delay(500);
-        }
+		CANbus::tick();
 		if( (CANbus::_tick % 100) == 0) {
 			// ESP_LOGI(FNAME,"Free Heap: %d bytes", heap_caps_get_free_size(MALLOC_CAP_8BIT) );
 			if( uxTaskGetStackHighWaterMark( cpid ) < 128 )
 				ESP_LOGW(FNAME,"Warning canbus task stack low: %d bytes", uxTaskGetStackHighWaterMark( cpid ) );
 		}
-        delay(50);
 	}
 }
 
@@ -201,7 +198,7 @@ bool CANbus::tick(){
 	msg.clear();
 	// Can bus receive tick
 	int id = 0;
-	int bytes = receive( &id, msg, 10 );
+	int bytes = receive( &id, msg, 500 );
 	// ESP_LOGI(FNAME,"CAN RX id:%02x, bytes:%d, connected:%d", id, bytes, _connected );
 	if( bytes ){
 		_connected_timeout = 0;
