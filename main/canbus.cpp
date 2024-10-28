@@ -5,7 +5,8 @@
 #include "sensor.h"
 #include "SString.h"
 #include "Router.h"
-
+#include "DataLink.h"
+#include "protocol/MagSens.h"
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -32,6 +33,8 @@ bool       CANbus::_connected;
 int        CANbus::_connected_timeout;
 TickType_t CANbus::_tx_timeout = 2;
 
+DataLink dlink;
+
 static TaskHandle_t cpid;
 static bool force_reconnect = false;
 
@@ -43,6 +46,7 @@ void CANbus::driverInstall( twai_mode_t mode, bool other_speed ){
 	if( _ready_initialized ){
         driverUninstall();
 	}
+
 	twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT( _tx_io, _rx_io, mode );
 	ESP_LOGI(FNAME, "default alerts %X", g_config.alerts_enabled);
 	g_config.alerts_enabled |= TWAI_ALERT_TX_IDLE | TWAI_ALERT_TX_SUCCESS | TWAI_ALERT_TX_FAILED;
@@ -140,6 +144,7 @@ void CANbus::begin()
 {
     //Initialize configuration structures using macro initializers
 	ESP_LOGI(FNAME,"CANbus::begin");
+	dlink.setProtocol(new MagSens());
 	driverInstall( TWAI_MODE_NORMAL );
 
 	xTaskCreatePinnedToCore(&canTask, "canTask", 4096, nullptr, 8, &cpid, 0);
@@ -161,7 +166,7 @@ int CANbus::receive( int *id, SString& msg, int timeout ){
 	if(ret == ESP_OK ){
 		// ESP_LOGI(FNAME,"RX CAN bus message ret=%02x TO:%d", ret, _connected_timeout_xcv );
 		if( rx.data_length_code > 0 && rx.data_length_code <= 8 ){
-            msg.append((const char*)rx.data, rx.data_length_code);
+			msg.set((const char*)rx.data, rx.data_length_code);
 			// ESP_LOGI(FNAME,"RX CAN bus message ret=(%02x), id:%04x bytes:%d, data:%s", ret, rx.identifier, rx.data_length_code, msg );
 			*id = rx.identifier;
 			return rx.data_length_code;
@@ -183,34 +188,34 @@ bool CANbus::tick(){
 		ESP_LOGI(FNAME,"CANbus not ready");
 		return true;
 	}
-	static SString msg;
+	SString msg;
 	// CAN bus send tick
-	if ( !can_tx_q.isEmpty() ){
-		// ESP_LOGI(FNAME,"There is CAN data");
-		if( _connected ){
-			if( Router::pullMsg( can_tx_q, msg ) ) {
+	// MagSens only send NMEA in response to a host query
+	while ( !can_tx_q.isEmpty() ) {
+		ESP_LOGI(FNAME,"There is CAN data");
+		if( Router::pullMsg( can_tx_q, msg ) ) {
+			if( _connected ) {
 				ESP_LOGI(FNAME,"CAN TX len: %d bytes", msg.length() );
 				// ESP_LOG_BUFFER_HEXDUMP(FNAME,msg.c_str(),msg.length(), ESP_LOG_DEBUG);
 				sendNMEA( msg.c_str() );
 			}
 		}
 	}
-	msg.clear();
+
 	// Can bus receive tick
+	msg.clear();
 	int id = 0;
 	int bytes = receive( &id, msg, 500 );
 	// ESP_LOGI(FNAME,"CAN RX id:%02x, bytes:%d, connected:%d", id, bytes, _connected );
 	if( bytes ){
 		_connected_timeout = 0;
+		ESP_LOGI(FNAME,"CAN RX NMEA chunk, id:%d, len:%d msg: %s", id, bytes, msg.c_str() );
+		ESP_LOG_BUFFER_HEXDUMP(FNAME, msg.c_str(), msg.length(), ESP_LOG_INFO);
+		dlink.process( msg.c_str(), msg.length(), 3 );
 	}
 	else{
 		_connected_timeout++;
-	}
-    // receive message of corresponding ID
-	if( id == 0x20 ) {     // start of nmea
-		// ESP_LOGI(FNAME,"CAN RX NMEA chunk, len:%d msg: %s", bytes, msg.c_str() );
-		// ESP_LOG_BUFFER_HEXDUMP(FNAME, msg.c_str(), msg.length(), ESP_LOG_INFO);
-		//dlink.process( msg.c_str(), msg.length(), 3 );  // (char *packet, int len, int port );
+		dlink.process(nullptr, 0, 0);
 	}
     return _connected;
 }
@@ -221,7 +226,7 @@ bool CANbus::sendNMEA( const SString& msg ){
 		return false;
     }
 	int len = msg.length();  // Including the terminating \0 -> need to remove this one byte at RX from strlen
-	ESP_LOGI(FNAME,"send CAN NMEA len %d, msg: %s", len, msg );
+	ESP_LOGI(FNAME,"send CAN NMEA len %d, msg: %s", len, msg.c_str() );
 	bool ret = true;
 	uint32_t alerts;
 	twai_read_alerts(&alerts, 0); // read and clear alerts
@@ -271,9 +276,9 @@ bool CANbus::selfTest(){
 		SString msg;
 		int rxid;
 		int bytes = receive( &rxid, msg, 10 );
-		ESP_LOGI(FNAME,"RX CAN bus message bytes:%d, id:%04x, data:%s", bytes, id, msg.c_str() );
+		ESP_LOGI(FNAME,"RX CAN bus message bytes:%d, id:%x, data:%s", bytes, rxid, msg.c_str() );
 		if( bytes != 7 || rxid != id ){
-			ESP_LOGW(FNAME,"CAN bus selftest RX call FAILED bytes:%d rxid%d recm:%s", bytes, rxid, msg.c_str() );
+			ESP_LOGW(FNAME,"CAN bus selftest RX call FAILED bytes:%d rxid%x recm:%s", bytes, rxid, msg.c_str() );
 			delay(i);
 			twai_clear_receive_queue();
 		}
@@ -321,7 +326,7 @@ bool CANbus::sendData( int id, const char* msg, int length, int self )
 	for (int i = 0; i < length; i++) {
 	    message.data[i] = msg[i];
 	}
-	// ESP_LOGI(FNAME,"TX CAN bus message id:%04x, bytes:%d, data:%s, self:%d", message.identifier, message.data_length_code, message.data, message.self );
+	ESP_LOGI(FNAME,"TX CAN bus message id:%x, bytes:%d, data:%c... self:%d", message.identifier, message.data_length_code, *message.data, message.self );
 
 	//Queue message for transmission
 	delay(1);
