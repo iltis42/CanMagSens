@@ -18,11 +18,11 @@
 
 
 /*
- *  Code for a 1:1 connection between two XCVario with a fixed message ID
- *
- *
+ *  1:1 connection between two XCVario with a fixed message ID
  *
  */
+
+#define MAGSENS_ID 0x31
 
 int CANbus::_tick = 0;
 volatile bool CANbus::_ready_initialized = false;
@@ -70,10 +70,14 @@ void CANbus::driverInstall( twai_mode_t mode, bool other_speed ){
 		t_config = TWAI_TIMING_CONFIG_1MBITS();
 	}
 
-	twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
-    //Install TWAI driver
+	twai_filter_config_t f_config = {
+		.acceptance_code = uint32_t(MAGSENS_ID << 21), // Shift for standard-ID (11 Bit)
+		.acceptance_mask = ~(uint32_t(0x7ff << 21)), // Only pay attention to those 11 id bits (not the first two message bytes)
+		.single_filter = true };
+
+	//Install TWAI driver
 	if (twai_driver_install(&g_config, &t_config, &f_config) == ESP_OK) {
-		ESP_LOGI(FNAME,"Driver installed OK, mode %d", mode );
+		ESP_LOGI(FNAME,"Driver installed OK, mode %d, filter %04x", mode, f_config.acceptance_code );
 	} else {
 		ESP_LOGI(FNAME,"Failed to install driver");
 		return;
