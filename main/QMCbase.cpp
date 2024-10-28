@@ -156,7 +156,7 @@ bool QMCbase::rawHeading( int16_t &xout, int16_t &yout, int16_t &zout )
 		zout = (data[5] << 8) | data[4];
 		xyz_map(xout, yout, zout);
 
-		ESP_LOGI( FNAME, "X:%d Y:%d Z:%d  STAT:%x", xout, yout, zout, status );
+		// ESP_LOGI( FNAME, "X:%d Y:%d Z:%d  STAT:%x", xout, yout, zout, status );
 		return true;
 	}
 	ESP_LOGE( FNAME, "read Register REG_X_LSB returned count != 6, count: %d", count );
