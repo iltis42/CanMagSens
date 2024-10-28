@@ -62,14 +62,3 @@ int Router::pullBlock( RingBufCPP<SString, QUEUE_SIZE>& q, char *block, int size
 	return total_len;
 }
 
-
-
-
-// route messages from CAN
-void Router::routeCAN(){
-	SString can;
-	while( pullMsg( can_rx_q, can ) ){
- 		;//Protocols::parseNMEA( can.c_str() );
-	}
-}
-

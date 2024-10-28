@@ -211,9 +211,6 @@ bool CANbus::tick(){
 		// ESP_LOG_BUFFER_HEXDUMP(FNAME, msg.c_str(), msg.length(), ESP_LOG_INFO);
 		//dlink.process( msg.c_str(), msg.length(), 3 );  // (char *packet, int len, int port );
 	}
-	if( !(_tick%4) ) {
-		Router::routeCAN();
-    }
     return _connected;
 }
 

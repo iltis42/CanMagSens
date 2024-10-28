@@ -35,8 +35,6 @@ public:
   // get one big block max 512 byte
   static int pullBlock( RingBufCPP<SString, QUEUE_SIZE>& q, char * block, int size );
   // route messages coming in from CAN interface
-  static void routeCAN();
-
 
 private:
 
