@@ -30,11 +30,7 @@
 I2C_t& i2c_0 = i2c0;  // i2c0 or i2c1
 
 static int msgsent = 0;
-static enum {
-	STREAM_OFF,
-	RAW_STREAM,
-	CALIBRATED
-} stream_status = RAW_STREAM;
+mag_state_t stream_status = RAW_STREAM;
 
 // Sensor board init method. Herein all functions that make the XCVario are launched and tested.
 extern "C" void  app_main(void){
@@ -122,51 +118,45 @@ extern "C" void  app_main(void){
 	y_scale *= magsens->getGain();
 	z_scale *= magsens->getGain();
 
+	// Decide on which stream to start fixme
+	if ( 1 ) {
+		stream_status = CALIBRATED;
+	}
+
 	esp_err_t ret = esp_task_wdt_add(NULL);
 	if( ret != ESP_OK ) {
 		ESP_LOGE(FNAME,"WDT add task failed %X", ret );
 	}
 
 	// Reduce logging from now on
-	constexpr esp_log_level_t log_level = ESP_LOG_ERROR;
+	constexpr esp_log_level_t log_level = ESP_LOG_INFO;
 	ESP_LOGI( FNAME, "Log level set globally to %d", log_level);
 	esp_log_level_set("*", log_level);
 
 	const uint64_t SENSOR_PERIOD = 100 * 1000; // 100 msec in usec
 	uint64_t sleep_time = SENSOR_PERIOD;
-	uint64_t last_timesys = esp_timer_get_time();
+	uint64_t wake_time = esp_timer_get_time();
 	while( 1 ){
-		sleep_time = SENSOR_PERIOD - (esp_timer_get_time() - last_timesys);
+
+		// Timeslot to listen on incomein kill stream messages
+		delay(30);
+
+		sleep_time = SENSOR_PERIOD - (esp_timer_get_time() - wake_time);
 		if ( sleep_time > SENSOR_PERIOD ) {
 				sleep_time = SENSOR_PERIOD;
 		}
-		esp_sleep_enable_timer_wakeup(sleep_time);
-		//ESP_LOGI(FNAME,"Sleep for = %lldsec", sleep_time );
-		// uint64_t before_sleep = esp_timer_get_time();
-		esp_err_t err = esp_light_sleep_start();
-		last_timesys = esp_timer_get_time();
 
-		// const char *wakeup_reason;
-		// esp_sleep_wakeup_cause_t wake_cause = esp_sleep_get_wakeup_cause();
-		// switch (wake_cause)
-		// {
-		// case ESP_SLEEP_WAKEUP_EXT0:
-		// 	wakeup_reason = "rtc io";
-		// 	break;
-		// case ESP_SLEEP_WAKEUP_EXT1:
-		// 	wakeup_reason = "rtc ctl";
-		// 	break;
-		// case ESP_SLEEP_WAKEUP_TIMER:
-		// 	wakeup_reason = "timer";
-		// 	break;
-		// case ESP_SLEEP_WAKEUP_GPIO:
-		// 	wakeup_reason = "button";
-		// 	break;
-		// default:
-		// 	wakeup_reason = "other";
-		// 	break;
-		// }
-		// ESP_LOGI(FNAME, "e%d: %s woken, slept for %lldusec.", err, wakeup_reason, last_timesys-before_sleep);
+		if ( stream_status == STREAM_OFF ) {
+			// Listen on CAN for commands
+			delay(sleep_time/1000);
+		}
+		else {
+			esp_sleep_enable_timer_wakeup(sleep_time);
+			//ESP_LOGI(FNAME,"Sleep for = %lldsec", sleep_time );
+			// uint64_t before_sleep = esp_timer_get_time();
+			esp_err_t err = esp_light_sleep_start();
+		}
+		wake_time = esp_timer_get_time();
 		
 		if ( stream_status != STREAM_OFF ) {
 			int16_t data[3];
