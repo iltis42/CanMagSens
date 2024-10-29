@@ -12,7 +12,7 @@
 // - Hello and version query:
 //   $PMH\r\n
 //
-// - The stream request: ( to be compatible a raw stream is picked up after 2 minutes time-out)
+// - The stream request: (to be compatible a stream is picked up straight after boot-up)
 //   $PMS<stream_type=r/c/..>\r\n
 //
 // - Transfer new calibration:
