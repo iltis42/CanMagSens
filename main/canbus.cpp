@@ -23,7 +23,10 @@
  *
  */
 
-#define MAGSENS_ID 0x31
+// used CAN Id's
+#define CANTEST_ID 0x100
+#define MAGSTREAM_ID 0x31
+#define MAGCTRL_ID 0x30
 
 int CANbus::_tick = 0;
 volatile bool CANbus::_ready_initialized = false;
@@ -75,13 +78,18 @@ void CANbus::driverInstall( twai_mode_t mode, bool other_speed ){
 	}
 
 	twai_filter_config_t f_config = {
-		.acceptance_code = uint32_t(MAGSENS_ID << 21), // Shift for standard-ID (11 Bit)
-		.acceptance_mask = ~(uint32_t(0x7ff << 21)), // Only pay attention to those 11 id bits (not the first two message bytes)
-		.single_filter = true };
+		// Shift for standard-ID (11 Bit) by 21, for multi filter mode another one shifted by 5.
+		.acceptance_code = uint32_t(MAGSTREAM_ID << 21) | uint32_t(MAGCTRL_ID << 5), 
+		// Disregard bits that are set on this mask
+		// For single filter mode you most likely wnat to set any bit, but those 11 id bits 
+		//  -> also disregard the first two message bytes: ~(uint32_t(0x7ff << 21))
+		// Here additionally the TEST_ID is disregarded (== let through(!))
+		.acceptance_mask = ~(uint32_t(0x7ff << 21)) | ~(uint32_t((0x7ff & ~CANTEST_ID) << 5)), 
+		.single_filter = false };
 
 	//Install TWAI driver
 	if (twai_driver_install(&g_config, &t_config, &f_config) == ESP_OK) {
-		ESP_LOGI(FNAME,"Driver installed OK, mode %d, filter %04x", mode, f_config.acceptance_code );
+		ESP_LOGI(FNAME,"Driver installed OK, mode %d, filter 0x%4x", mode, f_config.acceptance_code );
 	} else {
 		ESP_LOGI(FNAME,"Failed to install driver");
 		return;
@@ -209,7 +217,7 @@ bool CANbus::tick(){
 	// ESP_LOGI(FNAME,"CAN RX id:%02x, bytes:%d, connected:%d", id, bytes, _connected );
 	if( bytes ){
 		_connected_timeout = 0;
-		ESP_LOGI(FNAME,"CAN RX NMEA chunk, id:%d, len:%d msg: %s", id, bytes, msg.c_str() );
+		ESP_LOGI(FNAME,"CAN RX NMEA chunk, id:0x%x, len:%d msg: %s", id, bytes, msg.c_str() );
 		ESP_LOG_BUFFER_HEXDUMP(FNAME, msg.c_str(), msg.length(), ESP_LOG_INFO);
 		dlink.process( msg.c_str(), msg.length(), 3 );
 	}
@@ -234,7 +242,7 @@ bool CANbus::sendNMEA( const SString& msg ){
 		ESP_LOGW(FNAME,"Before send alerts %X", alerts);
     }
 	const int chunk=8;
-	int id = 0x20;
+	int id = MAGCTRL_ID;
 	const char *cptr = msg.c_str();
 	while( len > 0 )
 	{
@@ -261,7 +269,7 @@ bool CANbus::selfTest(){
 	ESP_LOGI(FNAME,"CAN bus selftest");
 	driverInstall( TWAI_MODE_NO_ACK );
 	bool res=false;
-	int id=0x100;
+	int id = CANTEST_ID;
 	delay(100);
 	twai_clear_receive_queue();
 	for( int i=0; i<10; i++ ){
@@ -276,9 +284,9 @@ bool CANbus::selfTest(){
 		SString msg;
 		int rxid;
 		int bytes = receive( &rxid, msg, 10 );
-		ESP_LOGI(FNAME,"RX CAN bus message bytes:%d, id:%x, data:%s", bytes, rxid, msg.c_str() );
+		ESP_LOGI(FNAME,"RX CAN bus message bytes:%d, id:0x%x, data:%s", bytes, rxid, msg.c_str() );
 		if( bytes != 7 || rxid != id ){
-			ESP_LOGW(FNAME,"CAN bus selftest RX call FAILED bytes:%d rxid%x recm:%s", bytes, rxid, msg.c_str() );
+			ESP_LOGW(FNAME,"CAN bus selftest RX call FAILED bytes:%d rxid%0xx recm:%s", bytes, rxid, msg.c_str() );
 			delay(i);
 			twai_clear_receive_queue();
 		}
@@ -326,7 +334,7 @@ bool CANbus::sendData( int id, const char* msg, int length, int self )
 	for (int i = 0; i < length; i++) {
 	    message.data[i] = msg[i];
 	}
-	ESP_LOGI(FNAME,"TX CAN bus message id:%x, bytes:%d, data:%c... self:%d", message.identifier, message.data_length_code, *message.data, message.self );
+	// ESP_LOGI(FNAME,"TX CAN bus message id:%x, bytes:%d, data:%c... self:%d", message.identifier, message.data_length_code, *message.data, message.self );
 
 	//Queue message for transmission
 	delay(1);
