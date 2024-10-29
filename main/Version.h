@@ -4,9 +4,8 @@
  *  Created on: Feb 10, 2019
  *      Author: iltis
  */
+#pragma once
 
-#ifndef MAIN_VERSION_H_
-#define MAIN_VERSION_H_
 
 class Version {
 public:
@@ -14,7 +13,7 @@ public:
 	virtual ~Version();
 	static char _version[32];
 	static char *version()  { return _version; };
+
+	static constexpr int RELEASE_NR = 2;
 };
 
-
-#endif /* MAIN_VERSION_H_ */

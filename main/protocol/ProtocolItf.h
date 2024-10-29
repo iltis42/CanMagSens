@@ -39,7 +39,7 @@ public:
 
 protected:
 	void reset() { _pos = 0; _len = 0; _crc = 0; }
-	bool push(char c) { if ( _pos < MAX_LEN ) {_framebuffer[_pos++] = c; incrCRC(c); return true;} return false; }
+	bool push(char c) { if ( _pos < MAX_LEN ) { _framebuffer[_pos++] = c; incrCRC(c); return true;} return false; }
 	virtual void incrCRC(const char c) = 0;
 	enum gen_state_t _state = START_TOKEN;
 	bool _pass_through = false;

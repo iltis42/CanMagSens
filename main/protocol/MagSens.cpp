@@ -8,10 +8,7 @@
 #include "Version.h"
 #include <logdef.h>
 
-// MagSens protocol message id's
-//static const char *MAGSENS_IDS = "HSCKU";
-
-// MagSens NMEA protocol is just a simple one. Those quueries are supported:
+// MagSens NMEA protocol is just a simple one. Those queries are supported:
 // - Hello and version query:
 //   $PMH\r\n
 //
@@ -26,7 +23,10 @@
 //
 // - Anounce firmware update:
 //   $PMU <length>*<CRC>\r\n
-
+//
+// The MagSens responses
+// - Version:
+//   $PMV <release_number>, <build_dateandtime>\r\n
 
 gen_state_t MagSens::nextByte(const char c)
 {
@@ -126,7 +126,7 @@ void MagSens::Version()
     ESP_LOGI(FNAME,"Pm Version");
     ::Version myVersion;
     char str[40];
-    sprintf( str, "$PMV %s\r\n", myVersion.version() );
+    sprintf( str, "$PMV %d, %s\r\n", Version::RELEASE_NR, myVersion.version() );
     SString nmea(str);
     Router::forwardMsg( nmea, can_tx_q );
 }
@@ -158,6 +158,7 @@ void MagSens::prepareUpdate()
 {
     ESP_LOGI(FNAME,"PM Update");
     stream_status = STREAM_OFF;
+    // Fixme, more to come
 }
 
 void MagSens::incrCRC(const char c)
