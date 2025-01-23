@@ -3,10 +3,11 @@
 #include "MagSens.h"
 
 #include "sensor.h"
-#include "Router.h"
+#include "nmea_util.h"
+#include "comm/Messages.h"
 #include "SetupNG.h"
 #include "Version.h"
-#include <logdef.h>
+#include "logdef.h"
 
 // MagSens NMEA protocol is just a simple one. Those queries are supported:
 // - Hello and version query:
@@ -28,78 +29,67 @@
 // - Version:
 //   $PMV <release_number>, <build_dateandtime>\r\n
 
-gen_state_t MagSens::nextByte(const char c)
+datalink_action_t MagSens::nextByte(const char c)
 {
-    ESP_LOGI(FNAME, "state %d, pos %d next char %c", _state, _pos, c);
-    switch(_state) {
+    int pos = _sm._frame.size() - 1; // c already in the buffer
+    datalink_action_t ret = NOACTION;
+    ESP_LOGI(FNAME, "state %d, pos %d next char %c", _sm._state, pos, c);
+    switch(_sm._state) {
     case START_TOKEN:
-    case CHECK_OK:
-    case CHECK_FAILED:
-    case ABORT:
         if ( c == '$' ) { // 0x24
-            _state = HEADER;
-            reset();
-            push(c);
-            _crc = 0;
+            _sm._state = HEADER;
+            ESP_LOGI(FNAME, "Msg START_TOKEN");
         }
-        ESP_LOGI(FNAME, "Msg START_TOKEN");
         break;
     case HEADER:
-        if ( _pos == 1 && c != 'P' ) {
-            _state = ABORT;
+        NMEA::incrCRC(_sm._crc,c);
+        if ( pos < 3 ) { break; }
+        if ( _sm._frame.substr(1,2) != "PM" ) {
+            _sm._state = START_TOKEN;
             break;
         }
-        else if ( _pos == 2 && c != 'M' ) {
-            _state = ABORT;
-            break;
-        }
-        else if ( _pos == 3 ) {
-            _state = PAYLOAD;
-            ESP_LOGI(FNAME, "Msg HEADER");
-        }
-        else if ( _pos > 3 ) {
-            _state = ABORT;
-            break;
-        }
-        push(c);
+        _sm._state = PAYLOAD;
         break;
     case PAYLOAD:
         if ( c == '*' ) {
-            _state = CHECK_CRC; // Expecting a CRC to check
+            _sm._state = CHECK_CRC1; // Expecting a CRC to check
             break;
         }
         if ( c != '\r' && c != '\n' ) {
             ESP_LOGI(FNAME, "Msg PAYLOAD");
-            if ( push(c) ) {
-                break;
-            }
-            // Buffer is full
-            _state = STOP_TOKEN;
+            NMEA::incrCRC(_sm._crc,c);
+            break;
         }
-        // Fall through 
-    case CHECK_CRC:
-        if( _state == CHECK_CRC ) { // did we not fall through
-            ESP_LOGI(FNAME, "Msg CRC %x - %x", c, _crc);
-            if ( c == _crc ) {
-                _state = CHECK_OK;
-            }
-            else {
-                _state = CHECK_FAILED;
-                break;
-            }
+        _sm._state = COMPLETE;
+        break;
+    case CHECK_CRC1:
+        _crc_buf[0] = c;
+        _sm._state = CHECK_CRC2;
+        break;
+    case CHECK_CRC2:
+    {
+        _crc_buf[1] = c;
+        _crc_buf[2] = '\0';
+        char read_crc = (char)strtol(_crc_buf, NULL, 16);
+        ESP_LOGD(FNAME, "Msg CRC %s/%x - %x", _crc_buf, read_crc, _sm._crc);
+        if ( read_crc != _sm._crc ) {
+            _sm._state = START_TOKEN;
+            break;
         }
+        _sm._state = COMPLETE;
         // Fall through 
+    }
     case STOP_TOKEN:
     case COMPLETE:
-        ESP_LOGI(FNAME, "Msg complete %c", _framebuffer[3]);
-        switch (_framebuffer[3]) {
+    {
+        _sm._state = START_TOKEN; // restart parsing
+        ESP_LOGI(FNAME, "Msg complete %s", _sm._frame.c_str());
+        switch (_sm._frame[3]) {
             case 'H':
                 Version();
                 break;
             case 'C':
-                if ( _state == CHECK_OK ) {
-                    parseCalibration();
-                }
+                parseCalibration();
                 break;
             case 'S':
                 startStream();
@@ -109,26 +99,32 @@ gen_state_t MagSens::nextByte(const char c)
                 break;
             case 'U':
                 prepareUpdate();
+                ret = NXT_PROTO;
                 break;
             default:
                 break;
         }
-        _state = START_TOKEN; // no routing nor parsing wanted
         break;
+    }
     default:
         break;
     }
-    return _state;
+    return ret;
+}
+
+datalink_action_t MagSens::nextStreamChunk(const char *cptr, int count)
+{
+    return NOACTION;
 }
 
 void MagSens::Version()
 {
     ESP_LOGI(FNAME,"Pm Version");
     ::Version myVersion;
-    char str[40];
-    sprintf( str, "$PMV %d, %s\r\n", Version::RELEASE_NR, myVersion.version() );
-    SString nmea(str);
-    Router::forwardMsg( nmea, can_tx_q );
+    Message* msg = newMessage();
+
+    msg->buffer = "$PMV " + std::to_string(Version::RELEASE_NR) + ", " + myVersion.version() + "\r\n";
+    DEV::Send(msg);
 }
 
 void MagSens::parseCalibration()
@@ -140,10 +136,10 @@ void MagSens::parseCalibration()
 void MagSens::startStream()
 {
     ESP_LOGI(FNAME,"PM Start Stream");
-    if ( _framebuffer[4] == 'r' ) {
+    if ( _sm._frame[4] == 'r' ) {
         stream_status = RAW_STREAM;
     }
-    else if ( _framebuffer[4] == 'c' ) {
+    else if ( _sm._frame[4] == 'c' ) {
         stream_status = CALIBRATED;
     }
 }
@@ -156,12 +152,9 @@ void MagSens::killStream()
 
 void MagSens::prepareUpdate()
 {
-    ESP_LOGI(FNAME,"PM Update");
     stream_status = STREAM_OFF;
-    // Fixme, more to come
+    
+    sscanf(_sm._frame.c_str(), "$PMU %d*", &_updateSize);
+    ESP_LOGI(FNAME,"PM Update size %d", _updateSize);
 }
 
-void MagSens::incrCRC(const char c)
-{
-    _crc ^= c;
-}

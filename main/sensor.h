@@ -9,3 +9,6 @@ typedef enum {
 } mag_state_t;
 
 extern mag_state_t stream_status;
+
+class MagSens;
+extern MagSens* MAG;

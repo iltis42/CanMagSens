@@ -28,7 +28,6 @@
  *
  */
 
-typedef enum e_can_speed { CAN_SPEED_250KBIT, CAN_SPEED_500KBIT, CAN_SPEED_1MBIT, CAN_SPEED_MAX } e_can_speed_t;
 typedef enum e_sync { SYNC_NONE, SYNC_FROM_MASTER, SYNC_FROM_CLIENT, SYNC_BIDIR } e_sync_t;
 
 
@@ -269,6 +268,7 @@ extern SetupNG<float>       compass_x_scale;
 extern SetupNG<float>       compass_y_scale;
 extern SetupNG<float>       compass_z_scale;
 extern SetupNG<int>         can_speed;
+extern SetupNG<int>         reg_token;
 
 
 #endif /* MAIN_SETUP_NG_H_ */
