@@ -46,7 +46,7 @@ void CANReceiveTask(void *arg)
         if (ESP_OK == twai_receive(&rx, pdMS_TO_TICKS(500)) && rx.data_length_code > 0)
         {
             msg.assign((char *)rx.data, rx.data_length_code);
-            ESP_LOGI(FNAME, "CAN RX NMEA chunk, id:0x%x, len:%d msg: %s", rx.identifier, rx.data_length_code, msg.c_str());
+            ESP_LOGD(FNAME, "CAN RX NMEA chunk, id:0x%x, len:%d msg: %s", rx.identifier, rx.data_length_code, msg.c_str());
             auto dl = can->_dlink.find(rx.identifier);
             if ( dl != can->_dlink.end() ) {
                 dl->second->process(msg.data(), msg.size());
@@ -138,20 +138,8 @@ void CANbus::driverInstall(twai_mode_t mode, CanSpeed speed)
         t_config = TWAI_TIMING_CONFIG_1MBITS();
     }
 
-    twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
-    // {
-    //     // Shift for standard-ID (11 Bit) by 21, for multi filter mode another one shifted by 5.
-    //     //.acceptance_code = uint32_t(JumboCmd::MAGSTREAM_ID << 21) | uint32_t(JumboCmd::MAGCTRL_ID << 5),
-    //     .acceptance_code = uint32_t(CANbus::CTRL_ID << 21), // | uint32_t(JumboCmd::MAGCTRL_ID << 5),
-    //     // Disregard bits that are set on this mask
-    //     // For single filter mode you most likely wnat to set any bit, but those 11 id bits
-    //     //  -> also disregard the first two message bytes: ~(uint32_t(0x7ff << 21))
-    //     // Here additionally the TEST_ID is disregarded (== let through(!))
-    //     .acceptance_mask = ~(uint32_t(0x7ff << 21)),
-    //     .single_filter = true
-    // };
-
     // Install TWAI driver
+    twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
     if (twai_driver_install(&g_config, &t_config, &f_config) == ESP_OK)
     {
         ESP_LOGI(FNAME, "Driver installed OK, mode %d, filter 0x%4x", mode, f_config.acceptance_code);
@@ -326,6 +314,7 @@ bool CANbus::sendData(int id, const char *msg, int length, int self)
         if ( res == ESP_OK ) {
             break;
         }
+
         ESP_LOGE(FNAME, "Transmit error: %s", esp_err_to_name(res));
         if (res == ESP_ERR_TIMEOUT) {
             ESP_LOGW(FNAME, "Transmit timeout. Message dropped.");
@@ -347,5 +336,5 @@ bool CANbus::sendData(int id, const char *msg, int length, int self)
         }
         return false;
     }
-    return true;
+    return (res == ESP_OK);
 }
