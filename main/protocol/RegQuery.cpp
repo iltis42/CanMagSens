@@ -53,7 +53,7 @@ RegQuery::RegQuery(int mp, ProtocolState &sm, DataLink &dl)
   : ProtocolItf(DeviceId::MASTER_DEV, mp, sm, dl),
     Clock_I(200) // generates a time-out callback ca. every two seconds
 {
-    // Create a token from serial number
+    // Once stored random token
     char buf[20];
     sprintf(buf, "%03d", reg_token.get());
     int len = strlen(buf);
@@ -162,13 +162,16 @@ datalink_action_t RegQuery::registration()
     // simple check
     if ( c_id > 0 && c_id < 0x7ff 
         && m_id > 0 && m_id < 0x7ff ) {
-            // success
-            ESP_LOGI(FNAME, "MS registered (ID=%d)", c_id);
-            MAG = static_cast<MagSens*>(DEVMAN->addDevice(MASTER_DEV, MAGSENS_P, c_id, m_id, CAN_BUS));
+        // success
+        ESP_LOGI(FNAME, "MS registered (ID=%d)", c_id);
+        MAG = static_cast<MagSens*>(DEVMAN->addDevice(MASTER_DEV, MAGSENS_P, c_id, m_id, CAN_BUS));
 
-            Clock::stop(this);
-            return NOACTION;
-        }
+        Clock::stop(this);
+        return NOACTION;
+    }
+    else {
+        ESP_LOGE(FNAME, "MS registration failed (ID=%d, MasterID=%d)", c_id, m_id);
+    }
     return NOACTION;
 }
 
@@ -179,7 +182,6 @@ datalink_action_t RegQuery::registration()
 bool RegQuery::sendRegistrationQuery()
 {
     Message* msg = newMessage();
-    if ( ! msg ) return false;
 
     msg->buffer = "$PJPREG ";
     msg->buffer += Q_TOKEN;
@@ -190,5 +192,10 @@ bool RegQuery::sendRegistrationQuery()
 
 void RegQuery::tick()
 {
-    sendRegistrationQuery();
+    if ( _nr_trials++ < MAX_NR_TRIALS ) {
+        sendRegistrationQuery();
+    }
+    else {
+        Clock::stop(this);
+    }
 }

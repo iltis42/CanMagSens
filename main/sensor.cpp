@@ -4,6 +4,7 @@
 #include "SetupNG.h"
 #include "comm/CanBus.h"
 #include "comm/DeviceMgr.h"
+#include "comm/Messages.h"
 #include "protocol/Clock.h"
 #include "QMC5883L.h"
 #include "QMC6310U.h"
@@ -94,7 +95,7 @@ extern "C" void  app_main(void)
 
 	ESP_LOGI(FNAME,"CAN bus selftest end");
 	DeviceManager* dm = DeviceManager::Instance();
-	dm->addDevice(DeviceId::MASTER_DEV, ProtocolType::REGISTRATION_P, CAN_REG_PORT, CAN_REG_PORT, CAN_BUS);
+	dm->addDevice(MASTER_DEV, REGISTRATION_P, CAN_REG_PORT, CAN_REG_PORT, CAN_BUS);
 
 	// Find the proper mag sensor chip 
 	QMCbase *magsens;
@@ -112,11 +113,8 @@ extern "C" void  app_main(void)
 		}
 		delete magsens;
 
-		ESP_LOGW(FNAME,"Failed to find a magnetic sensor");
+		ESP_LOGE(FNAME,"Failed to find a magnetic sensor");
 		delay(1000);
-	}
-	if ( ! QMCbase::haveSensor() ) {
-		ESP_LOGW(FNAME,"Magnetic sensor init failed");
 	}
 
 	// Load the nvs stored bias and scale calibration
@@ -144,11 +142,6 @@ extern "C" void  app_main(void)
 	x_scale *= magsens->getGain();
 	y_scale *= magsens->getGain();
 	z_scale *= magsens->getGain();
-
-	// Decide on which stream to start fixme
-	if ( 1 ) {
-		stream_status = STREAM_OFF;
-	}
 
 	esp_err_t ret = esp_task_wdt_add(NULL);
 	if( ret != ESP_OK ) {
@@ -190,22 +183,23 @@ extern "C" void  app_main(void)
 			int16_t &x=data[0], &y=data[1], &z=data[2];
 			if( magsens->rawHeading( x,y,z) ){
 				bool can_ok = false;
-				int payload;
 				if ( stream_status == RAW_STREAM ) {
-					payload = 6;
-					can_ok = CAN->Send( (char *)data, payload, MagSens::MAGSTREAM_ID );
+					// legacy data stream
+					Message *msg = DEV::acqMessage(MASTER_DEV, MagSens::MAGSTREAM_ID);
+					msg->buffer.assign((char *)(data), 6);
+					DEV::Send(msg);
 				}
-				else if ( stream_status == CALIBRATED ) {
-					float data[3];
-					float &xf=data[0], &yf=data[1], &zf=data[2];
-					xf = (x - x_bias) * x_scale;
-					yf = (y - y_bias) * y_scale;
-					zf = (z - z_bias) * z_scale;
-					payload = 8;
-					can_ok = CAN->Send( (char *)data, payload, MagSens::MAGSTREAM_ID );
-					payload = 4;
-					can_ok += CAN->Send( (char *)&zf, payload, MagSens::MAGSTREAM_ID );
-				}
+				// else if ( stream_status == CALIBRATED ) {
+				// 	float data[3];
+				// 	float &xf=data[0], &yf=data[1], &zf=data[2];
+				// 	xf = (x - x_bias) * x_scale;
+				// 	yf = (y - y_bias) * y_scale;
+				// 	zf = (z - z_bias) * z_scale;
+				// 	payload = 8;
+				// 	can_ok = CAN->Send( (char *)data, payload, MagSens::MAGSTREAM_ID );
+				// 	payload = 4;
+				// 	can_ok += CAN->Send( (char *)&zf, payload, MagSens::MAGSTREAM_ID );
+				// }
 				if( can_ok == 0 ) {
 					msgsent++;
 					if( !(msgsent%200) ) {

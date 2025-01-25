@@ -62,7 +62,7 @@ void TransmitTask(void *arg)
             int len = msg->buffer.length();
             int port = msg->port;
             InterfaceCtrl *itf = DEVMAN->getIntf(msg->target_id);
-            ESP_LOGI(FNAME, "send to dev %d %s/%d NMEA len %d, msg: %s", msg->target_id, itf->getStringId(), port, len, msg->buffer.c_str());
+            ESP_LOGD(FNAME, "send to dev %d %s/%d NMEA len %d, msg: %s", msg->target_id, itf->getStringId(), port, len, msg->buffer.c_str());
             if ( ! itf || (itf->Send(msg->buffer.c_str(), len, port) != 0) ) {
                 ESP_LOGE(FNAME, "failed sending");
             }

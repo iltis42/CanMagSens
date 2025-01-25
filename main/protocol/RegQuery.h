@@ -19,10 +19,11 @@ public:
     explicit RegQuery(int mp, ProtocolState &sm, DataLink &dl);
     virtual ~RegQuery();
 
-    ProtocolType getProtocolId() override { return REGISTRATION_P; }
-
 public:
+    ProtocolType getProtocolId() override { return REGISTRATION_P; }
     datalink_action_t nextByte(const char c) override;
+
+    static constexpr int MAX_NR_TRIALS = 20;
 
     // The only transmitter
     bool sendRegistrationQuery();
@@ -34,4 +35,5 @@ private:
     // Actions on commands
     datalink_action_t registration();
     char Q_TOKEN[4];
+    int _nr_trials = 0;
 };
