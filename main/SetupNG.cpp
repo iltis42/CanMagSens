@@ -8,9 +8,10 @@
 #include "SetupNG.h"
 
 #include "ESP32NVS.h"
-#include "esp32/rom/uart.h"
-#include <esp32/rom/miniz.h>
+#include "comm/CanBus.h"
 
+// #include "esp32/rom/uart.h"
+#include <esp32/rom/miniz.h>
 #include "esp_system.h"
 #include <logdef.h>
 
@@ -32,7 +33,7 @@ SetupNG<float>          compass_x_scale( "CP_X_SCALE", 1.f );
 SetupNG<float>          compass_y_scale( "CP_Y_SCALE", 1.f );
 SetupNG<float>          compass_z_scale( "CP_Z_SCALE", 1.f );
 SetupNG<int>            can_speed( "CANSPEED", CAN_SPEED_1MBIT );
-
+SetupNG<int>            reg_token( "REGTOKEN", 0 );
 
 SetupCommon * SetupCommon::getMember( const char * key ){
 	for(int i = 0; i < entries.size(); i++ ) {
