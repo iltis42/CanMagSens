@@ -47,7 +47,7 @@ public:
 static DmyItf dummy_itf;
 
 // generic transmitter grabbing messages from a queue
-void TransmitTask(void *arg)
+void IRAM_ATTR TransmitTask(void *arg)
 {
     QueueHandle_t queue = (QueueHandle_t)arg;
     Message* msg;
@@ -100,7 +100,7 @@ ProtocolItf* DeviceManager::addDevice(DeviceId did, ProtocolType proto, int list
 {
     // On first device a send task needs to be created
     if ( ! SendTask ) {
-        xTaskCreate(TransmitTask, "genTx", 3000, ItfSendQueue, 90, &SendTask);
+        xTaskCreate(TransmitTask, "genTx", 3000, ItfSendQueue, 70, &SendTask);
     }
     InterfaceCtrl *itf = &dummy_itf;
     if ( iid == CAN_BUS ) {

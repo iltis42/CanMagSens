@@ -26,7 +26,7 @@ static bool terminate_receiver = false;
 static bool do_recover = false;
 
 // CAN receiver task
-void CANReceiveTask(void *arg)
+void IRAM_ATTR CANReceiveTask(void *arg)
 {
     CANbus* can = static_cast<CANbus*>(arg);
     unsigned int tick = 0;
@@ -203,7 +203,7 @@ bool CANbus::begin(CanSpeed speed)
         driverInstall(TWAI_MODE_NORMAL, CanSpeed::CAN_SPEED_1MBIT);
 
         terminate_receiver = false;
-        xTaskCreate(&CANReceiveTask, "CanRx", 4096, this, 10, &rxTask);
+        xTaskCreate(&CANReceiveTask, "CanRx", 4096, this, 80, &rxTask);
     } else {
         driverUninstall();
     }
