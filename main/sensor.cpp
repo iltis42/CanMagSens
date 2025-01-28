@@ -166,16 +166,16 @@ extern "C" void  app_main(void)
 				sleep_time = SENSOR_PERIOD;
 		}
 
-		// if ( stream_status == STREAM_OFF ) {
+		if ( stream_status == STREAM_OFF ) {
 			// Listen on CAN for commands
 			delay(sleep_time/1000);
-		// }
-		// else {
-		// 	esp_sleep_enable_timer_wakeup(sleep_time);
-		// 	//ESP_LOGI(FNAME,"Sleep for = %lldsec", sleep_time );
-		// 	// uint64_t before_sleep = esp_timer_get_time();
-		// 	esp_err_t err = esp_light_sleep_start();
-		// }
+		}
+		else {
+			esp_sleep_enable_timer_wakeup(sleep_time);
+			// ESP_LOGI(FNAME,"Sleep for = %lldusec", sleep_time );
+			// uint64_t before_sleep = esp_timer_get_time();
+			esp_err_t err = esp_light_sleep_start();
+		}
 		wake_time = esp_timer_get_time();
 		
 		if ( stream_status != STREAM_OFF ) {
@@ -187,7 +187,7 @@ extern "C" void  app_main(void)
 					// legacy data stream
 					Message *msg = DEV::acqMessage(MASTER_DEV, MagSens::MAGSTREAM_ID);
 					msg->buffer.assign((char *)(data), 6);
-					DEV::Send(msg);
+					can_ok = DEV::Send(msg);
 				}
 				// else if ( stream_status == CALIBRATED ) {
 				// 	float data[3];
