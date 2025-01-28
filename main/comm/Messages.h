@@ -11,10 +11,13 @@
 #include <memory>
 
 
+constexpr int PREALLOC_BUF_SIZE = 128;
+
 // One Message
 class Message
 {
 public:
+    Message() { buffer.reserve(PREALLOC_BUF_SIZE); }
     std::string hexDump(int upto=0) const;
     bool busy = false;
     DeviceId target_id = DeviceId::NO_DEVICE;
