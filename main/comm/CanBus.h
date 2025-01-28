@@ -45,6 +45,7 @@ private:
     const gpio_num_t _rx_io;
     bool _initialized = false;
     int _tx_timeout = 2; // [msec] about two times the time for 111 bit to send
+    int _error_batch = 0; // criteria to reboot, when bus seems to be down
     CanSpeed _speed = CAN_SPEED_1MBIT; // fixme
 };
 

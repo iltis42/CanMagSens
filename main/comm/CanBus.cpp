@@ -284,6 +284,9 @@ int CANbus::Send(const char *cptr, int &len, int port)
         return 0;
     }
     else {
+        if ( _error_batch > 60 ) {
+            esp_restart(); // this never apeared to be solved otherwise
+        }
         len = len - rem; // buffered bytes
         return (rem/chunk + 1) * _tx_timeout; // ETA to wait for next trial
     }
@@ -315,11 +318,12 @@ bool CANbus::sendData(int id, const char *msg, int length, int self)
     esp_err_t res = ESP_OK;
     while ( retry-- > 0 )
     {
-        res = twai_transmit(&message, 0);
+        res = twai_transmit(&message, pdMS_TO_TICKS(_tx_timeout));
         if ( res == ESP_OK ) {
+            _error_batch = 0;
             break;
         }
-
+        _error_batch++;
         ESP_LOGE(FNAME, "Transmit error: %s", esp_err_to_name(res));
         if (res == ESP_ERR_TIMEOUT) {
             ESP_LOGW(FNAME, "Transmit timeout. Message dropped.");
