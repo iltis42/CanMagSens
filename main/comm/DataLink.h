@@ -25,11 +25,13 @@ public:
     bool hasProtocol(ProtocolType ptyp) const;
     void deleteProtocol(ProtocolItf *proto);
     void process(const char *packet, int len);
-    int getPort() const { return _itf_id.port; }
-    int getItf() const { return _itf_id.iid; }
-    bool goBIN(ProtocolItf *peer);
+    ProtocolItf *goBIN();
     void goNMEA();
     int getNumNMEA() const;
+    ProtocolItf *getBinary() const;
+    void updateRoutes();
+    int getPort() const { return _itf_id.port; }
+    int getItf() const { return _itf_id.iid; }
     // dbg
     void dumpProto();
 
@@ -45,4 +47,8 @@ private:
     ProtocolState _sm; // The message buffer for all protocol parser
     // Listen on
     const ItfTarget _itf_id;
+    // All protocols attached to this data linnk should have the same device id, here just for opt. checks
+    DeviceId    _did = NO_DEVICE;
+    // Routing
+    RoutingList _routes;
 };

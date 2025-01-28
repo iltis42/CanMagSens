@@ -154,6 +154,16 @@ ProtocolItf *DeviceManager::getProtocol(DeviceId did, ProtocolType proto)
     return nullptr;
 }
 
+// convenience
+int DeviceManager::getSendPort(DeviceId did, ProtocolType proto)
+{
+    Device *dev = getDevice(did);
+    if ( dev ) {
+        return dev->getSendPort(proto);
+    }
+    return -1;
+}
+
 // Remove device from map, delete device and all resources
 void DeviceManager::removeDevice(DeviceId did)
 {
@@ -172,6 +182,7 @@ void DeviceManager::removeDevice(DeviceId did)
             }
         }
     }
+    refreshRouteCache();
 }
 
 // routing lookup table
@@ -211,20 +222,26 @@ RoutingList DeviceManager::getRouting(RoutingTarget target)
     }
 }
 
+// Refresh routes after a change of the devices map
+void DeviceManager::refreshRouteCache()
+{
+    for ( auto dev : _device_map ) {
+        // all devices
+        for ( auto dl : dev.second->_dlink ) {
+            // all data  links
+            dl->updateRoutes();
+        }
+    }
+}
+
 // Start a binary data route
-DataLink *DeviceManager::getFlarmBinPeer()
+DataLink *DeviceManager::getFlarmHost()
 {
     for ( auto &d : _device_map ) {
         DataLink *dl = d.second->getDLforProtocol(FLARMHOST_P);
         if ( dl ) return dl;
     }
     return nullptr;
-}
-
-// Recover all Flarm data routes back to NMEA mode
-void DeviceManager::resetFlarmModeToNmea()
-{
-
 }
 
 // prio - 0,..,4 0:low prio data stream, .. 5: important high prio commanding
@@ -302,13 +319,14 @@ int Device::getSendPort(ProtocolType p) const
         return tmp->getSendPort();
     }
 
-    return 0;
+    return -1; // invalid port
 }
 
 
 
-// Some global routines from the router, they might move elswhere
-namespace DEV {
+// A set of convenience routines to use the pool
+namespace DEV
+{
 
 Message* acqMessage(DeviceId target_id, int port)
 {
