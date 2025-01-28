@@ -5,46 +5,50 @@
 #include "sensor.h"
 #include "nmea_util.h"
 #include "comm/Messages.h"
-#include "SetupNG.h"
+#include "comm/DataLink.h"
+// #include "SetupNG.h"
 #include "Version.h"
 #include "logdef.h"
 
 // MagSens NMEA protocol is just a simple one. Those queries are supported:
 // - Hello and version query:
-//   $PMH\r\n
+//   $PMSH\r\n
 //
 // - The stream request: (to be compatible a stream is picked up straight after boot-up)
-//   $PMS<stream_type=r/c/..>\r\n
+//   $PMSS<stream_type=r/c/..>\r\n
 //
 // - Transfer new calibration:
-//   $PMC ... *<CRC>\r\n
+//   $PMSC, ... *<CRC>\r\n
 //
 // - Kill stream request:
-//   $PMK\r\n
+//   $PMSK\r\n
 //
 // - Anounce firmware update:
-//   $PMU <length>*<CRC>\r\n
+//   $PMSU, <length>, <packet_size>*<CRC>\r\n
 //
 // The MagSens responses
 // - Version:
-//   $PMV <release_number>, <build_dateandtime>\r\n
+//   $PMSV, <release_number>, <build_dateandtime>\r\n
+//
+// - Firmware packet confirmation:
+//   $PMSC, <enum>\r\n
 
 datalink_action_t MagSens::nextByte(const char c)
 {
     int pos = _sm._frame.size() - 1; // c already in the buffer
     datalink_action_t ret = NOACTION;
-    ESP_LOGI(FNAME, "state %d, pos %d next char %c", _sm._state, pos, c);
+    ESP_LOGD(FNAME, "state %d, pos %d next char %c", _sm._state, pos, c);
     switch(_sm._state) {
     case START_TOKEN:
         if ( c == '$' ) { // 0x24
             _sm._state = HEADER;
-            ESP_LOGI(FNAME, "Msg START_TOKEN");
+            ESP_LOGD(FNAME, "Msg START_TOKEN");
         }
         break;
     case HEADER:
         NMEA::incrCRC(_sm._crc,c);
         if ( pos < 3 ) { break; }
-        if ( _sm._frame.substr(1,2) != "PM" ) {
+        if ( _sm._frame.substr(1,3) != "PMS" ) {
             _sm._state = START_TOKEN;
             break;
         }
@@ -56,7 +60,7 @@ datalink_action_t MagSens::nextByte(const char c)
             break;
         }
         if ( c != '\r' && c != '\n' ) {
-            ESP_LOGI(FNAME, "Msg PAYLOAD");
+            ESP_LOGD(FNAME, "Msg PAYLOAD");
             NMEA::incrCRC(_sm._crc,c);
             break;
         }
@@ -77,14 +81,14 @@ datalink_action_t MagSens::nextByte(const char c)
             break;
         }
         _sm._state = COMPLETE;
-        // Fall through 
+        break;
     }
     case STOP_TOKEN:
     case COMPLETE:
     {
         _sm._state = START_TOKEN; // restart parsing
         ESP_LOGI(FNAME, "Msg complete %s", _sm._frame.c_str());
-        switch (_sm._frame[3]) {
+        switch (_sm._frame[4]) {
             case 'H':
                 Version();
                 break;
@@ -114,47 +118,120 @@ datalink_action_t MagSens::nextByte(const char c)
 
 datalink_action_t MagSens::nextStreamChunk(const char *cptr, int count)
 {
+    if ( _updateHandle ) {
+        if ( _buff_fill + count > _updPackSize ) {
+            _packEnum++;
+            if ( esp_ota_write(_updateHandle, _uptBuffer, _buff_fill) ) {
+                confirmPacket(_packEnum);
+            }
+            _buff_fill = 0;
+        }
+        memcpy(_uptBuffer+_buff_fill, cptr, count);
+        _buff_fill += count;
+        _bytesReceived += count;
+        if ( (_bytesReceived % 300) == 0 ) {
+            ESP_LOGI(FNAME, "received %d", _bytesReceived);
+        }
+    }
+    if ( _bytesReceived >= _updateSize ) {
+        ESP_LOGI(FNAME, "Received complete update.");
+        if ( _buff_fill > 0 ) {
+            esp_ota_write(_updateHandle, _uptBuffer, _buff_fill);
+        }
+        if (esp_ota_end(_updateHandle) == ESP_OK)
+        {
+            _updateHandle = 0;
+            // Lets update the partition
+            if (esp_ota_set_boot_partition(_updatePartition) == ESP_OK)
+            {
+                const esp_partition_t *boot_partition = esp_ota_get_boot_partition();
+
+                ESP_LOGI(FNAME, "Next boot partition subtype %d at offset 0x%x", boot_partition->subtype, boot_partition->address);
+
+            }
+            else
+            {
+                ESP_LOGE(FNAME, "\r\n\r\n !!! Flashed Error !!!\r\n");
+            }
+        }
+        ESP_LOGI(FNAME, "rebooting ..");
+        delay(1000);
+        esp_restart();
+        // _binary = false;
+        // return GO_NMEA;
+    }
     return NOACTION;
 }
 
 void MagSens::Version()
 {
-    ESP_LOGI(FNAME,"Pm Version");
+    ESP_LOGI(FNAME,"PMS Version");
     ::Version myVersion;
     Message* msg = newMessage();
 
-    msg->buffer = "$PMV " + std::to_string(Version::RELEASE_NR) + ", " + myVersion.version() + "\r\n";
+    msg->buffer = "$PMSV, " + std::to_string(Version::RELEASE_NR) + ", " + myVersion.version() + "\r\n";
     DEV::Send(msg);
 }
 
 void MagSens::parseCalibration()
 {
-    ESP_LOGI(FNAME,"PM Calib");
+    ESP_LOGI(FNAME,"PMS Calib");
     // Fixme: Content to come
 }
 
 void MagSens::startStream()
 {
-    ESP_LOGI(FNAME,"PM Start Stream");
-    if ( _sm._frame[4] == 'r' ) {
+    ESP_LOGI(FNAME,"PMS Start Stream");
+    if ( _sm._frame[5] == 'r' ) {
         stream_status = RAW_STREAM;
     }
-    else if ( _sm._frame[4] == 'c' ) {
+    else if ( _sm._frame[5] == 'c' ) {
         stream_status = CALIBRATED;
     }
 }
 
 void MagSens::killStream()
 {
-    ESP_LOGI(FNAME,"PM Kill Stream");
+    ESP_LOGI(FNAME,"PMS Kill Stream");
     stream_status = STREAM_OFF;
 }
 
 void MagSens::prepareUpdate()
 {
+    // $PMSU, %d, %d*
     stream_status = STREAM_OFF;
     
-    sscanf(_sm._frame.c_str(), "$PMU %d*", &_updateSize);
-    ESP_LOGI(FNAME,"PM Update size %d", _updateSize);
+    // read size of update
+    int pos = 5;
+    _updateSize = std::stoi(NMEA::extractWord(_sm._frame, pos));
+    _updPackSize = std::stoi(NMEA::extractWord(_sm._frame, pos));
+    ESP_LOGI(FNAME,"PMS Update size %d", _updateSize);
+
+    // Init the update
+    _updatePartition = esp_ota_get_next_update_partition(NULL);
+    ESP_LOGI(FNAME, "Next update prt.: %p", _updatePartition);
+    _packEnum = 0;
+    _bytesReceived = 0;
+    _buff_fill = 0;
+    esp_err_t res = esp_ota_begin(_updatePartition, _updateSize, &_updateHandle);
+    if (res == ESP_OK) {
+        _uptBuffer = (char *)malloc(_updPackSize);
+    }
+    else {
+        ESP_LOGE(FNAME, "Failed to initiate update: %s", esp_err_to_name(res));
+        _updateHandle = 0; // Let the bytes pass
+    }
+    // Switch to a binary version of this receiver for the next _updateSize bytes
+    _binary = true;
+    _dl.goBIN();
 }
 
+void MagSens::confirmPacket(int nr)
+{
+    // $PMSC, <enum>\r\n
+    Message* msg = newMessage();
+    ESP_LOGI(FNAME,"PMS confirm to did%D - %d", msg->target_id, nr);
+
+    msg->buffer = "$PMSC, " + std::to_string(nr) + "\r\n";
+    DEV::Send(msg);
+}
