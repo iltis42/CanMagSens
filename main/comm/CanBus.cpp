@@ -30,6 +30,7 @@ void CANReceiveTask(void *arg)
 {
     CANbus* can = static_cast<CANbus*>(arg);
     unsigned int tick = 0;
+    bool to_once = true;
 
     if ( ! can->isInitialized() )
     {
@@ -50,13 +51,17 @@ void CANReceiveTask(void *arg)
             auto dl = can->_dlink.find(rx.identifier);
             if ( dl != can->_dlink.end() ) {
                 dl->second->process(msg.data(), msg.size());
+                to_once = true;
             }
         }
         else
         {
-            // protocol state machine may want to react on no traffic
-            for (auto &dl : can->_dlink ) {
-                dl.second->process(nullptr, 0);
+            // protocol state machine may want to react on no traffic -- once
+            if ( to_once ) { 
+                for (auto &dl : can->_dlink ) {
+                    dl.second->process(nullptr, 0);
+                }
+                to_once = false;
             }
         }
 
