@@ -47,7 +47,7 @@ void IRAM_ATTR CANReceiveTask(void *arg)
         if (ESP_OK == twai_receive(&rx, pdMS_TO_TICKS(500)) && rx.data_length_code > 0)
         {
             msg.assign((char *)rx.data, rx.data_length_code);
-            ESP_LOGD(FNAME, "CAN RX NMEA chunk, id:0x%x, len:%d msg: %s", rx.identifier, rx.data_length_code, msg.c_str());
+            ESP_LOGD(FNAME, "CAN RX NMEA chunk, id:0x%x, len:%d msg: %s", (unsigned int)(rx.identifier), rx.data_length_code, msg.c_str());
             auto dl = can->_dlink.find(rx.identifier);
             if ( dl != can->_dlink.end() ) {
                 dl->second->process(msg.data(), msg.size());
@@ -109,13 +109,13 @@ void CANbus::driverInstall(twai_mode_t mode, CanSpeed speed)
     }
 
     twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(_tx_io, _rx_io, mode);
-    ESP_LOGI(FNAME, "default alerts %X", g_config.alerts_enabled);
+    ESP_LOGI(FNAME, "default alerts %X", (unsigned int)(g_config.alerts_enabled));
     // g_config.alerts_enabled = TWAI_ALERT_TX_FAILED | TWAI_ALERT_BUS_OFF | TWAI_ALERT_ABOVE_ERR_WARN | TWAI_ALERT_BUS_ERROR;
     g_config.alerts_enabled = TWAI_ALERT_ALL;
     g_config.bus_off_io = GPIO_NUM_NC;
     g_config.rx_queue_len = 15;
     g_config.tx_queue_len = 15;
-    ESP_LOGI(FNAME, "set alerts to %X", g_config.alerts_enabled);
+    ESP_LOGI(FNAME, "set alerts to %X", (unsigned int)(g_config.alerts_enabled));
 
     twai_timing_config_t t_config;
     _speed = speed;
@@ -147,7 +147,7 @@ void CANbus::driverInstall(twai_mode_t mode, CanSpeed speed)
     twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
     if (twai_driver_install(&g_config, &t_config, &f_config) == ESP_OK)
     {
-        ESP_LOGI(FNAME, "Driver installed OK, mode %d, filter 0x%4x", mode, f_config.acceptance_code);
+        ESP_LOGI(FNAME, "Driver installed OK, mode %d, filter 0x%04x", mode, (unsigned int)(f_config.acceptance_code));
     }
     else
     {
@@ -188,7 +188,7 @@ void CANbus::recover()
             // recovery is only possible in this state
             ESP_LOGW(FNAME, "CANbus recover");
             twai_initiate_recovery();
-            vTaskDelay(10 / portTICK_PERIOD_MS);
+            vTaskDelay(pdMS_TO_TICKS(10));
             twai_start();
         }
     }
@@ -254,7 +254,7 @@ bool CANbus::selfTest()
         else
         {
             std::string msg((char*)rx.data, rx.data_length_code);
-            ESP_LOGW(FNAME, "CAN bus selftest RX call FAILED bytes:%d rxid:%x rxmsg:%s", rx.data_length_code, rx.identifier, msg.c_str());
+            ESP_LOGW(FNAME, "CAN bus selftest RX call FAILED bytes:%d rxid:%x rxmsg:%s", (unsigned int)(rx.data_length_code), (unsigned int)(rx.identifier), msg.c_str());
             twai_clear_receive_queue();
         }
     }
@@ -329,7 +329,7 @@ bool CANbus::sendData(int id, const char *msg, int length, int self)
             ESP_LOGW(FNAME, "Transmit timeout. Message dropped.");
         }
         twai_read_alerts(&alerts, pdMS_TO_TICKS(_tx_timeout));
-        ESP_LOGW(FNAME, "Tx chunk failed alerts 0x%x", alerts );
+        ESP_LOGW(FNAME, "Tx chunk failed alerts 0x%x", (unsigned int)(alerts) );
     }
     if ( alerts != 0 )
     {

@@ -6,7 +6,7 @@
 #include <freertos/semphr.h>
 #include <logdef.h>
 
-xSemaphoreHandle nvMutex=NULL;
+SemaphoreHandle_t nvMutex=NULL;
 
 ESP32NVS * ESP32NVS::Instance = 0;
 
@@ -29,7 +29,7 @@ bool ESP32NVS::begin(){
 }
 
 void ESP32NVS::close(){
-  ESP_LOGI(FNAME,"ESP32NVS::close() %04X", _nvs_handle );
+  ESP_LOGI(FNAME,"ESP32NVS::close() %04X", (unsigned int)(_nvs_handle) );
   if( _nvs_handle ) {
      nvs_close(_nvs_handle);
      _nvs_handle = 0;
@@ -66,7 +66,7 @@ bool ESP32NVS::erase(std::string key){
 }
 
 bool ESP32NVS::commit(){
-  ESP_LOGI(FNAME,"ESP32NVS::commit() %04X", _nvs_handle );
+  ESP_LOGI(FNAME,"ESP32NVS::commit() %04X", (unsigned int)(_nvs_handle) );
   _err = nvs_commit(_nvs_handle);
   if(_err != ESP_OK)  {
 	  ESP_LOGE(FNAME,"ESP32NVS::commit() error");
@@ -133,8 +133,8 @@ bool ESP32NVS::setString(std::string key, std::string value){
 }
 
 bool ESP32NVS::setObject(std::string key, void* value, size_t length){
-  ESP_LOGI(FNAME,"ESP32NVS::setObject(%s , %08x, %d, handle: %04x)", key.c_str(), (uint32_t)value, length, _nvs_handle);
-  xSemaphoreTake(nvMutex,portMAX_DELAY );
+  ESP_LOGI(FNAME,"ESP32NVS::setObject(%s , %08x, %d, handle: %04x)", key.c_str(), (unsigned int)(value), length, (unsigned int)(_nvs_handle));
+  xSemaphoreTake(nvMutex, portMAX_DELAY );
   esp_err_t _err = nvs_set_blob(_nvs_handle, (char*)key.c_str(), value, length);
   if(_err != ESP_OK) {
 	  ESP_LOGE(FNAME,"set blob error %d", _err );

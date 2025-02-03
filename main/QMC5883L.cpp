@@ -92,7 +92,7 @@ bool QMC5883L::selfTest()
 		return false;
 	}
 	i2c_bus->writeByte( addr, REG_CONTROL2, 0 ); // Clear soft reset
-	delay(20);
+	vTaskDelay(pdMS_TO_TICKS(20));
 
 	uint8_t chipId = 0;
 	// Try to read Register 0xD, it delivers the chip id 0xff for a QMC5883L
@@ -100,7 +100,7 @@ bool QMC5883L::selfTest()
 		if( i2c_bus->readByte( addr, REG_CHIP_ID, &chipId ) == ESP_OK ) {
 			break;
 		}
-		delay(5);
+		vTaskDelay(pdMS_TO_TICKS(5));
 	}
 	if( ! chipId ){
 		ESP_LOGE( FNAME,"QMC5883L Read Chip ID failed" );

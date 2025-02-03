@@ -24,10 +24,11 @@ IN THE SOFTWARE.
 #ifndef _I2CBUS_HPP_
 #define _I2CBUS_HPP_
 
-#include <stdint.h>
 #include "driver/i2c.h"
 #include "driver/gpio.h"
 #include "esp_err.h"
+
+#include <cstdint>
 
 
 /* ^^^^^^
@@ -53,7 +54,6 @@ class I2C {
  private:
     i2c_port_t port;            /*!< I2C port: I2C_NUM_0 or I2C_NUM_1 */
     uint32_t ticksToWait;       /*!< Timeout in ticks for read and write */
-    static bool initDone[2];
 
  public:
     explicit I2C(i2c_port_t port);
@@ -109,9 +109,6 @@ class I2C {
      */
     esp_err_t writeBit(uint8_t devAddr, uint8_t regAddr, uint8_t bitNum, uint8_t data, int32_t timeout = -1);
     esp_err_t writeBits(uint8_t devAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t data, int32_t timeout = -1);
-    esp_err_t read8bit( uint8_t addr, uint16_t *word );
-    esp_err_t read16bit( uint8_t addr, uint16_t *word );
-    esp_err_t write8bit( uint8_t addr, uint16_t word );
     esp_err_t writeByte(uint8_t devAddr, uint8_t regAddr, uint8_t data, int32_t timeout = -1);
     esp_err_t writeBytes(uint8_t devAddr, uint8_t regAddr, size_t length, const uint8_t *data, int32_t timeout = -1);
 

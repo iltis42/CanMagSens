@@ -1,7 +1,5 @@
 #pragma once
 
-#define delay(x) vTaskDelay(x/portTICK_PERIOD_MS)
-
 typedef enum {
 	STREAM_OFF,
 	RAW_STREAM,

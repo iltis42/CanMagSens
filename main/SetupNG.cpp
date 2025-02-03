@@ -10,9 +10,9 @@
 #include "ESP32NVS.h"
 #include "comm/CanBus.h"
 
-// #include "esp32/rom/uart.h"
-#include <esp32/rom/miniz.h>
-#include "esp_system.h"
+#include <miniz.h>
+#include <esp_system.h>
+#include <esp_mac.h>
 #include <logdef.h>
 
 #include <string>

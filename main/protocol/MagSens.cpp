@@ -6,7 +6,6 @@
 #include "nmea_util.h"
 #include "comm/Messages.h"
 #include "comm/DataLink.h"
-// #include "SetupNG.h"
 #include "Version.h"
 #include "logdef.h"
 
