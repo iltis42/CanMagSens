@@ -10,6 +10,7 @@
 #include <freertos/task.h>
 #include <freertos/semphr.h>
 
+#include <esp_task_wdt.h>
 #include <driver/gpio.h>
 #include <esp_err.h>
 
@@ -32,12 +33,12 @@ void IRAM_ATTR CANReceiveTask(void *arg)
     unsigned int tick = 0;
     bool to_once = true;
 
-    if ( ! can->isInitialized() )
+    while ( ! can->isInitialized() )
     {
         ESP_LOGI(FNAME, "CANbus not ready");
-        vTaskDelete(NULL);
-        // return;
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
+    esp_task_wdt_add(NULL);
 
     std::string msg; // scratch buffer
     msg.resize(10);
@@ -57,7 +58,7 @@ void IRAM_ATTR CANReceiveTask(void *arg)
         else
         {
             // protocol state machine may want to react on no traffic -- once
-            if ( to_once ) { 
+            if ( to_once ) {
                 for (auto &dl : can->_dlink ) {
                     dl.second->process(nullptr, 0);
                 }
@@ -77,6 +78,8 @@ void IRAM_ATTR CANReceiveTask(void *arg)
                 ESP_LOGW(FNAME, "Warning canbus task stack low: %d bytes", uxTaskGetStackHighWaterMark(rxTask));
             }
         }
+
+        esp_task_wdt_reset();
     } while ( true );
 
     // cannot stop twai when waiting on twai_receive (->crash)
