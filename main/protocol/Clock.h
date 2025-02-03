@@ -8,15 +8,15 @@
 
 #pragma once
 
-#include "ClockIntf.h"
-
 #include <esp_timer.h>
+
+class Clock_I;
 
 // Clock based on esp_timer
 class Clock
 {
 public:
-    static constexpr int TICK_ATOM = 10; // msec
+    static constexpr unsigned long TICK_ATOM = 10; // msec
 
 public:
     Clock();

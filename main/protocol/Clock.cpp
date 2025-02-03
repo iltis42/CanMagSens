@@ -7,26 +7,29 @@
  ***********************************************************/
 
 #include "Clock.h"
+#include "ClockIntf.h"
 
+#include <freertos/FreeRTOS.h>
 #include <esp_attr.h>
+
+#include <vector>
+#include <algorithm>
 
 esp_timer_handle_t Clock::_clock_timer = nullptr;
 
 static volatile unsigned long msec_counter = 0;
 
 // Simple fix number of slots registry
-const int NRSLOTS = 4;
-static Clock_I *clock_registry[NRSLOTS];
+static std::vector<Clock_I*> clock_registry;
 
 // Timer SR (called in a timer task context)
-static void IRAM_ATTR clock_timer_sr(Clock_I** registry)
+static void IRAM_ATTR clock_timer_sr(std::vector<Clock_I*> *registry)
 {
     // be in sync with millis, but sparse
     msec_counter = esp_timer_get_time() / 1000;
     // tick callbacks
-    for ( int i=0; i<NRSLOTS; i++ ) {
-        Clock_I *cb = registry[i];
-        if ( cb && cb->myTurn() ) { cb->tick(); }
+    for ( auto it : *registry ) {
+        if ( it->myTurn() ) { it->tick(); }
     }
 }
 
@@ -34,42 +37,44 @@ static void IRAM_ATTR clock_timer_sr(Clock_I** registry)
 // The clock
 Clock::Clock()
 {
-    // setup clock timer only once
+    clock_registry.resize(5);
+    clock_registry.clear();
+
+    // setup clock timer
     if ( _clock_timer == 0 ) {
         esp_timer_create_args_t t_args = {
             .callback = (esp_timer_cb_t)clock_timer_sr,
-            .arg = clock_registry,
+            .arg = (void*)(&clock_registry),
             .dispatch_method = ESP_TIMER_TASK,
             .name = "clock",
             .skip_unhandled_events = true,
 
         };
         esp_timer_create(&t_args, &_clock_timer);
-        esp_timer_start_periodic(_clock_timer, TICK_ATOM * 1000); // the timers API is on usec
-        for ( int i=0; i<NRSLOTS; i++ ) {
-            clock_registry[i] = nullptr;
-        }
+        esp_timer_start_periodic(_clock_timer, TICK_ATOM * 1000);
     }
 }
 
 
+static void remove_from_registry(Clock_I *cb)
+{
+    auto it = std::find(clock_registry.begin(), clock_registry.end(), cb);
+    if (it != clock_registry.end()) {
+        clock_registry.erase(it);
+    }
+}
 void Clock::start(Clock_I *cb)
 {
-    stop(cb);
-    for ( int i=0; i<NRSLOTS; i++ ) {
-        if ( clock_registry[i] == nullptr ) {
-            clock_registry[i] = cb;
-            break;
-        }
-    }
+    esp_timer_stop(_clock_timer);
+    remove_from_registry(cb); // enforce one entry only
+    clock_registry.push_back(cb);
+    esp_timer_start_periodic(_clock_timer, TICK_ATOM * 1000);
 }
 void Clock::stop(Clock_I *cb)
 {
-    for ( int i=0; i<NRSLOTS; i++ ) {
-        if ( clock_registry[i] == cb ) {
-            clock_registry[i] = nullptr;
-        }
-    }
+    esp_timer_stop(_clock_timer);
+    remove_from_registry(cb);
+    esp_timer_start_periodic(_clock_timer, TICK_ATOM * 1000);
 }
 
 unsigned long Clock::getMillis()

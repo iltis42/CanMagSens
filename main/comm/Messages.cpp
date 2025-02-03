@@ -6,11 +6,6 @@
 #include <sstream>
 #include <iomanip>
 
-const int BUFFER_COUNT = 20;
-
-// Fixme, not yet thought t the end, it must not get mixed up with others in the regular queue
-Message spare_msg; // To be able to grant a message, even this one will not be an exclusive buffer worst case.
-
 std::string Message::hexDump(int upto) const
 {
     if ( upto == 0 ) upto = buffer.size();
@@ -24,8 +19,8 @@ std::string Message::hexDump(int upto) const
 MessagePool::MessagePool()
 {
     // Preallocate the desired number of messages
-    _buffers.reserve(BUFFER_COUNT);
-    for (int i = 0; i < BUFFER_COUNT; ++i) {
+    _buffers.reserve(MSG_POOL_SIZE);
+    for (int i = 0; i < MSG_POOL_SIZE; ++i) {
         _buffers.emplace_back(new Message);
         _freeList.push(_buffers.back());
     }
@@ -33,10 +28,12 @@ MessagePool::MessagePool()
 }
 MessagePool::~MessagePool()
 {
-    for (int i = 0; i < BUFFER_COUNT; ++i) {
+    SemaphoreHandle_t tmp = _mutex;
+    _mutex = nullptr;
+    for (int i = 0; i < MSG_POOL_SIZE; ++i) {
         delete _buffers[i];
     }
-    vSemaphoreDelete(_mutex);
+    vSemaphoreDelete(tmp);
 }
 
 // granted none nullptr return value
@@ -44,18 +41,17 @@ Message* MessagePool::getOne()
 {
     Message* msg = nullptr;
     xSemaphoreTake(_mutex, portMAX_DELAY);
-    if ( ! _freeList.empty() ) {
-        msg = _freeList.front();
-        msg->busy = true;
-        _freeList.pop();
-        _nr_acquisition++;
-    }
-    else {
-        msg = &spare_msg;
+    while ( _freeList.empty() )
+    {
+        xSemaphoreGive(_mutex);
+        vTaskDelay(pdMS_TO_TICKS(10));
         _nr_acqfails++;
-        ESP_LOGW(FNAME, "Buffer pool empty.");
-
+        xSemaphoreTake(_mutex, portMAX_DELAY);
     }
+    msg = _freeList.front();
+    msg->busy = true;
+    _freeList.pop();
+    _nr_acquisition++;
     xSemaphoreGive(_mutex);
     return msg;
 }
@@ -69,10 +65,10 @@ void MessagePool::recycleMsg(Message* msg) {
 
 int MessagePool::nrFree() const
 {
-    return 0; // todo
+    return _freeList.size();
 }
 int MessagePool::nrUsed() const
 {
-    return 0; // todo
+    return MSG_POOL_SIZE - _freeList.size();
 }
 

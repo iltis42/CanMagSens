@@ -111,7 +111,7 @@ bool QMC6310U::selfTest()
 		}
 	}
 	i2c_bus->writeByte( addr, REG_CONTROL2, 0 );  // Clear soft reset
-	delay(20);
+	vTaskDelay(pdMS_TO_TICKS(20));
 
 	// Try to read Register 0x00, it delivers the chip id 0x80 for a QMC6310
 	ESP_LOGI( FNAME, "QMC6310 selftest check chip ID");
@@ -121,7 +121,7 @@ bool QMC6310U::selfTest()
 		if( err == ESP_OK ) {
 			break;
 		}
-		delay(5);
+		vTaskDelay(pdMS_TO_TICKS(5));
 	}
 
 	if( ! chipId ) {
@@ -152,14 +152,14 @@ bool QMC6310U::initialize()
 	uint8_t rdtmp, temp = (range << 2) | MODE_SET_ON_RESET_ON;
 	ESP_LOGI( FNAME, "initialize Reg2: %x", temp );
 	e1 = i2c_bus->writeByte( addr, REG_CONTROL2, temp );
-	delay(2);
+	vTaskDelay(pdMS_TO_TICKS(2));
 	e2 = i2c_bus->readByte( addr, REG_CONTROL2, &rdtmp );
 	ESP_LOGI( FNAME, "initialize Reg2 read: %x (%d)", rdtmp, e2 );
 	
 	temp = (osr << 4) | (odr << 2) | MODE_CONTINUOUS;
 	ESP_LOGI( FNAME, "initialize Reg1: %x", temp );
 	e3 = writeRegister( REG_CONTROL1, temp );
-	delay(2);
+	vTaskDelay(pdMS_TO_TICKS(2));
 	e2 = i2c_bus->readByte( addr, REG_CONTROL1, &rdtmp );
 	ESP_LOGI( FNAME, "initialize Reg1 read: %x (%d)", rdtmp, e2 );
 

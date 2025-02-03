@@ -8,6 +8,9 @@
 
 #pragma once
 
+#include <vector>
+#include <map>
+
 #include <cinttypes>
 
 // List of supported devices
@@ -38,6 +41,7 @@ typedef enum
     FLARMHOST_P,
     FLARMBIN_P,
     MAGSENS_P,
+    MAGSENSBIN_P,
     NMEA_P,
     TEST_P
 } ProtocolType;
@@ -66,11 +70,17 @@ struct RoutingTarget {
     }
 };
 
+// Routing table on device level, details on protocol requirements are not defined here
+typedef std::vector<RoutingTarget> RoutingList;
+typedef std::map<RoutingTarget, RoutingList> RoutingMap;
+
+
 constexpr int CAN_REG_PORT = 0x7f0;
 
 class Message;
 
-namespace DEV {
+namespace DEV
+{
 
 Message* acqMessage(DeviceId target, int port);
 inline void relMessage(Message *msg);

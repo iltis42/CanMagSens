@@ -47,7 +47,7 @@ public:
 static DmyItf dummy_itf;
 
 // generic transmitter grabbing messages from a queue
-void TransmitTask(void *arg)
+void IRAM_ATTR TransmitTask(void *arg)
 {
     QueueHandle_t queue = (QueueHandle_t)arg;
     Message* msg;
@@ -100,7 +100,7 @@ ProtocolItf* DeviceManager::addDevice(DeviceId did, ProtocolType proto, int list
 {
     // On first device a send task needs to be created
     if ( ! SendTask ) {
-        xTaskCreate(TransmitTask, "genTx", 3000, ItfSendQueue, 90, &SendTask);
+        xTaskCreate(TransmitTask, "genTx", 3000, ItfSendQueue, 22, &SendTask);
     }
     InterfaceCtrl *itf = &dummy_itf;
     if ( iid == CAN_BUS ) {
@@ -125,9 +125,10 @@ ProtocolItf* DeviceManager::addDevice(DeviceId did, ProtocolType proto, int list
     if ( is_new ) {
         // Add only if new
         _device_map[did] = dev; // and add, in case this dev is new
-        dev->_dlink.insert(dl);
         dev->_itf = itf;
     }
+    dev->_dlink.insert(dl);
+    refreshRouteCache();
 
     ESP_LOGI(FNAME, "After add device %d.", did);
     dumpMap();
@@ -153,6 +154,16 @@ ProtocolItf *DeviceManager::getProtocol(DeviceId did, ProtocolType proto)
     return nullptr;
 }
 
+// convenience
+int DeviceManager::getSendPort(DeviceId did, ProtocolType proto)
+{
+    Device *dev = getDevice(did);
+    if ( dev ) {
+        return dev->getSendPort(proto);
+    }
+    return -1;
+}
+
 // Remove device from map, delete device and all resources
 void DeviceManager::removeDevice(DeviceId did)
 {
@@ -171,6 +182,7 @@ void DeviceManager::removeDevice(DeviceId did)
             }
         }
     }
+    refreshRouteCache();
 }
 
 // routing lookup table
@@ -203,27 +215,33 @@ RoutingList DeviceManager::getRouting(RoutingTarget target)
                 tit++;
             }
         }
-        return std::move(res);
+        return res;
     }
     else {
         return RoutingList();
     }
 }
 
+// Refresh routes after a change of the devices map
+void DeviceManager::refreshRouteCache()
+{
+    for ( auto dev : _device_map ) {
+        // all devices
+        for ( auto dl : dev.second->_dlink ) {
+            // all data  links
+            dl->updateRoutes();
+        }
+    }
+}
+
 // Start a binary data route
-DataLink *DeviceManager::getFlarmBinPeer()
+DataLink *DeviceManager::getFlarmHost()
 {
     for ( auto &d : _device_map ) {
         DataLink *dl = d.second->getDLforProtocol(FLARMHOST_P);
         if ( dl ) return dl;
     }
     return nullptr;
-}
-
-// Recover all Flarm data routes back to NMEA mode
-void DeviceManager::resetFlarmModeToNmea()
-{
-
 }
 
 // prio - 0,..,4 0:low prio data stream, .. 5: important high prio commanding
@@ -301,13 +319,14 @@ int Device::getSendPort(ProtocolType p) const
         return tmp->getSendPort();
     }
 
-    return 0;
+    return -1; // invalid port
 }
 
 
 
-// Some global routines from the router, they might move elswhere
-namespace DEV {
+// A set of convenience routines to use the pool
+namespace DEV
+{
 
 Message* acqMessage(DeviceId target_id, int port)
 {
@@ -324,15 +343,13 @@ void relMessage(Message *msg)
 
 bool Send(Message* msg)
 {
-    if ( ItfSendQueue ) {
-        if ( pdTRUE != xQueueSend( ItfSendQueue, (void * ) &msg, (TickType_t)0 ) ) {
-            // drop it
-            ESP_LOGW(FNAME, "Dropped message to %d", msg->target_id);
-            MP.recycleMsg(msg);
-        }
-        return true;
+    if ( pdTRUE != xQueueSend( ItfSendQueue, (void * ) &msg, portMAX_DELAY ) ) { // pdMS_TO_TICKS(50) ) ) {
+        // drop it
+        ESP_LOGW(FNAME, "Dropped message to %d", msg->target_id);
+        MP.recycleMsg(msg);
+        return false;
     }
-    return false;
+	return true;
 }
 
 } // namespace

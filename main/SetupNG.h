@@ -14,7 +14,7 @@
 #include <string>
 #include <cstdio>
 #include <vector>
-
+#include <typeinfo>
 
 
 
@@ -128,7 +128,7 @@ public:
 			ESP_LOGE(FNAME,"NVS error");
 			return false;
 		}
-		ESP_LOGI(FNAME,"NVS commit(key:%s , addr:%08x, len:%d, nvs handle: %04x)", _key, (unsigned int)(&_value), sizeof( _value ), _nvs_handle);
+		ESP_LOGI(FNAME,"NVS commit(key:%s , addr:%08x, len:%d, nvs handle: %04x)", _key, (unsigned int)(&_value), sizeof( _value ), (unsigned int)(_nvs_handle));
 		esp_err_t _err = nvs_set_blob(_nvs_handle, _key, (void *)(&_value), sizeof( _value ));
 		sync();
 		if(_err != ESP_OK) {
@@ -205,7 +205,7 @@ public:
 		if(_err != ESP_OK)
 			return false;
 		else {
-			ESP_LOGI(FNAME,"NVS erased %s by handle %d", _key, _nvs_handle );
+			ESP_LOGI(FNAME,"NVS erased %s by handle %d", _key, (int)(_nvs_handle) );
 			if( set( _default ) )
 				return true;
 			else

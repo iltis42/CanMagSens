@@ -42,11 +42,11 @@ extern InterfaceCtrl* CAN;
 //      drive as well.
 //      Second parameter is a string with the letters "MAGSENS" to identify the desired protocol to talk, and thus the kind of devcie
 //      requesting.
-//   $PJPREG <token>, <protocol type>\r\n
+//   $PJPREG, <token>, <protocol type>\r\n
 //
 // The expected master response
 // - Registration query accepted: A master respons with the query token, a drive id to listen, and a master id to respond messages to.
-//   $PJMACC <token>, <drive id>, <master id>*<CRC>\r\n
+//   $PJMACC, <token>, <drive id>, <master id>*<CRC>\r\n
 //
 
 RegQuery::RegQuery(int mp, ProtocolState &sm, DataLink &dl)
@@ -60,6 +60,7 @@ RegQuery::RegQuery(int mp, ProtocolState &sm, DataLink &dl)
     strcpy(Q_TOKEN, &buf[len-3]);
 
     Clock::start(this); // register query kicker time-out
+    ESP_LOGI(FNAME, "time %ldmsec", Clock::getMillis());
 }
 
 RegQuery::~RegQuery()
@@ -71,23 +72,23 @@ datalink_action_t RegQuery::nextByte(const char c)
 {
     int pos = _sm._frame.size() - 1; // c already in the buffer
     datalink_action_t ret = NOACTION;
-    ESP_LOGI(FNAME, "state %d, pos %d next char %c", _sm._state, pos, c);
+    ESP_LOGD(FNAME, "state %d, pos %d next char %c", _sm._state, pos, c);
     switch(_sm._state) {
     case START_TOKEN:
         if ( c == '$' ) {
             _sm._state = HEADER;
-            ESP_LOGI(FNAME, "Msg START_TOKEN");
+            ESP_LOGD(FNAME, "Msg START_TOKEN");
         }
         break;
     case HEADER:
         NMEA::incrCRC(_sm._crc,c);
-        if ( pos < 4 ) { break; }
+        if ( pos < 3 ) { break; }
         if ( _sm._frame.substr(1,3) != "PJM" ) {
             _sm._state = START_TOKEN;
             break;
         }
         _sm._state = PAYLOAD;
-        ESP_LOGI(FNAME, "Msg HEADER");
+        ESP_LOGD(FNAME, "Msg HEADER");
         break;
     case PAYLOAD:
         if ( c == '*' ) {
@@ -95,7 +96,7 @@ datalink_action_t RegQuery::nextByte(const char c)
             break;
         }
         if ( c != '\r' && c != '\n' ) {
-            ESP_LOGI(FNAME, "Msg PAYLOAD");
+            ESP_LOGD(FNAME, "Msg PAYLOAD");
             NMEA::incrCRC(_sm._crc,c);
             break;
         }
@@ -140,30 +141,30 @@ datalink_action_t RegQuery::nextByte(const char c)
 
 datalink_action_t RegQuery::registration()
 {
-    // grab token from e.g. message "$PJMACC 123, j_id, m_id"
+    // grab token from e.g. message "$PJMACC, 123, j_id, m_id"
     if ( _sm._frame.size() < 12 ) {
         return NOACTION;
     }
-    std::string tail = _sm._frame.substr(8);
+    int pos = 8;
+    std::string tail = NMEA::extractWord(_sm._frame, pos);
+    ESP_LOGI(FNAME, "MS token >%s<", tail.c_str());
 
     // check on correct token
     if ( tail.compare(0, 3, Q_TOKEN) != 0 ) {
         return NOACTION;
     }
 
-    // read the drive id
-    size_t pos = tail.find(',') +1;
-    int c_id = std::stoi(tail.substr(pos));
+    // read the device id
+    int c_id = std::stoi(NMEA::extractWord(_sm._frame, pos));
 
     // read the master id
-    pos = tail.find(',', pos) +1; 
-    int m_id = std::stoi(tail.substr(pos));
+    int m_id = std::stoi(NMEA::extractWord(_sm._frame, pos));
 
     // simple check
     if ( c_id > 0 && c_id < 0x7ff 
         && m_id > 0 && m_id < 0x7ff ) {
         // success
-        ESP_LOGI(FNAME, "MS registered (ID=%d)", c_id);
+        ESP_LOGI(FNAME, "MS registered (CH:%d)", c_id);
         MAG = static_cast<MagSens*>(DEVMAN->addDevice(MASTER_DEV, MAGSENS_P, c_id, m_id, CAN_BUS));
 
         Clock::stop(this);
@@ -183,7 +184,7 @@ bool RegQuery::sendRegistrationQuery()
 {
     Message* msg = newMessage();
 
-    msg->buffer = "$PJPREG ";
+    msg->buffer = "$PJPREG, ";
     msg->buffer += Q_TOKEN;
     msg->buffer += ", MAGSENS\r\n";
     ESP_LOGI(FNAME, "MS send request: %s", msg->buffer.c_str());

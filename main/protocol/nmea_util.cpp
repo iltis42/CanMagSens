@@ -40,27 +40,30 @@ std::string CheckSum(const char *nmea)
 
 // Extract the next word
 // str - the frame buffer
-// pos - points to the position after the last word delimiter
-std::string extractWord(const std::string &str, int pos) {
-    int i = pos;
+// pos - points to the position of the current word delimiter
+// returns:
+// srting - the extracted word
+// pos - points to the next commy seperator
+std::string extractWord(const std::string &str, int &pos)
+{
     int len = str.size();
     const char *cptr = str.c_str() + pos;
-    while ( i < len ) {
-        if ( *cptr != ' ' ) {
+    while ( pos < len ) {
+        if ( *cptr != ' ' && *cptr != ',' ) {
             break;
         }
-        i++;
+        pos++;
         cptr++;
     }
-    int wstart = i;
-    while ( i < len ) {
+    int wstart = pos;
+    while ( pos < len ) {
         if ( *cptr == ',' || *cptr == ' '  || *cptr == '*'  || *cptr == '\r'  || *cptr == '\n' ) {
             break;
         }
-        i++;
+        pos++;
         cptr++;
     }
-    return str.substr(wstart, i-wstart);
+    return str.substr(wstart, pos-wstart);
 }
 
 void incrCRC(int &crc, const char c)

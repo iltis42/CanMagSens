@@ -6,22 +6,21 @@
 #include "comm/DeviceMgr.h"
 #include "comm/Messages.h"
 #include "protocol/Clock.h"
+#include "protocol/MagSens.h"
 #include "QMC5883L.h"
 #include "QMC6310U.h"
 #include "ESP32NVS.h"
-#include "protocol/MagSens.h"
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <esp_system.h>
-#include <driver/adc.h>
+#include <esp_random.h>
+#include <esp_flash.h>
+#include <esp_chip_info.h>
 #include <driver/gpio.h>
-#include <esp_wifi.h>
 #include <logdef.h>
 
 #include <I2Cbus.hpp>
-#include <esp32/rom/miniz.h>
-#include <esp32/rom/uart.h>
 #include <driver/gpio.h>
 #include <esp_task_wdt.h>
 #include <esp_pm.h>
@@ -47,8 +46,6 @@ extern "C" void  app_main(void)
 	bool setupPresent;
 	SetupCommon::initSetup( setupPresent );
 
-	esp_wifi_set_mode(WIFI_MODE_NULL);
-
 	esp_chip_info_t chip_info;
 	esp_chip_info(&chip_info);
 	ESP_LOGI( FNAME,"This is ESP32 chip with %d CPU core(s), WiFi%s%s, ",
@@ -56,14 +53,18 @@ extern "C" void  app_main(void)
 			(chip_info.features & CHIP_FEATURE_BT) ? "/BT" : "",
 					(chip_info.features & CHIP_FEATURE_BLE) ? "/BLE" : "");
 	ESP_LOGI( FNAME,"Silicon revision %d, ", chip_info.revision);
-	ESP_LOGI( FNAME,"%dMB %s flash\n", spi_flash_get_chip_size() / (1024 * 1024),
+	
+	uint32_t size = 0;
+	esp_flash_get_size(nullptr, &size);
+	ESP_LOGI( FNAME,"%dMB %s flash\n", (int)size / (1024 * 1024),
 			(chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
 
     // Configure power mode
-    esp_pm_config_esp32c3_t pmconf;
-    pmconf.max_freq_mhz = 80;
-    pmconf.min_freq_mhz = 80;
-    pmconf.light_sleep_enable = false;
+    esp_pm_config_t pmconf = {
+		.max_freq_mhz = 80,
+		.min_freq_mhz = 80,
+		.light_sleep_enable = false,
+	};
     esp_pm_configure(&pmconf);
 
 	NVS.begin();
@@ -79,7 +80,7 @@ extern "C" void  app_main(void)
 	if( ! CAN->begin() ) {
 		ESP_LOGE(FNAME,"CAN bus selftest failed" );
         // CAN might not be connected, reboot
-        delay(2000);
+        vTaskDelay(pdMS_TO_TICKS(2000));
         esp_restart();
     }
 
@@ -89,7 +90,7 @@ extern "C" void  app_main(void)
 		srand(seed);
 		// Generate a pseudo-random number
 		int random_number = rand();
-		ESP_LOGI(FNAME, "Seed: %u, Random number: %d\n", seed, random_number);
+		ESP_LOGI(FNAME, "Seed: %u, Random number: %d\n", (unsigned int)(seed), random_number);
 		reg_token.set(random_number);
 	}
 
@@ -114,7 +115,7 @@ extern "C" void  app_main(void)
 		delete magsens;
 
 		ESP_LOGE(FNAME,"Failed to find a magnetic sensor");
-		delay(1000);
+		vTaskDelay(pdMS_TO_TICKS(1000));
 	}
 
 	// Load the nvs stored bias and scale calibration
@@ -159,23 +160,23 @@ extern "C" void  app_main(void)
 	while( 1 ){
 
 		// Timeslot to listen on incomein kill stream messages
-		// delay(30);
+		// vTaskDelay(pdMS_TO_TICKS((30));
 
 		sleep_time = SENSOR_PERIOD - (esp_timer_get_time() - wake_time);
 		if ( sleep_time > SENSOR_PERIOD ) {
-				sleep_time = SENSOR_PERIOD;
+			sleep_time = SENSOR_PERIOD;
 		}
 
-		// if ( stream_status == STREAM_OFF ) {
+		if ( stream_status == STREAM_OFF ) {
 			// Listen on CAN for commands
-			delay(sleep_time/1000);
-		// }
-		// else {
-		// 	esp_sleep_enable_timer_wakeup(sleep_time);
-		// 	//ESP_LOGI(FNAME,"Sleep for = %lldsec", sleep_time );
-		// 	// uint64_t before_sleep = esp_timer_get_time();
-		// 	esp_err_t err = esp_light_sleep_start();
-		// }
+			vTaskDelay(pdMS_TO_TICKS(sleep_time/1000));
+		}
+		else {
+			esp_sleep_enable_timer_wakeup(sleep_time);
+			// ESP_LOGI(FNAME,"Sleep for = %lldusec", sleep_time );
+			// uint64_t before_sleep = esp_timer_get_time();
+			esp_err_t err = esp_light_sleep_start();
+		}
 		wake_time = esp_timer_get_time();
 		
 		if ( stream_status != STREAM_OFF ) {
@@ -187,7 +188,7 @@ extern "C" void  app_main(void)
 					// legacy data stream
 					Message *msg = DEV::acqMessage(MASTER_DEV, MagSens::MAGSTREAM_ID);
 					msg->buffer.assign((char *)(data), 6);
-					DEV::Send(msg);
+					can_ok = DEV::Send(msg);
 				}
 				// else if ( stream_status == CALIBRATED ) {
 				// 	float data[3];
