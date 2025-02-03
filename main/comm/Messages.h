@@ -11,6 +11,7 @@
 #include <memory>
 
 
+constexpr int MSG_POOL_SIZE = 20;
 constexpr int PREALLOC_BUF_SIZE = 128;
 
 // One Message
