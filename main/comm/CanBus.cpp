@@ -206,7 +206,7 @@ bool CANbus::begin(CanSpeed speed)
         driverInstall(TWAI_MODE_NORMAL, CanSpeed::CAN_SPEED_1MBIT);
 
         terminate_receiver = false;
-        xTaskCreate(&CANReceiveTask, "CanRx", 4096, this, 80, &rxTask);
+        xTaskCreate(&CANReceiveTask, "CanRx", 4096, this, 21, &rxTask);
     } else {
         driverUninstall();
     }
