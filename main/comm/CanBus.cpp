@@ -229,17 +229,17 @@ bool CANbus::selfTest()
 {
     ESP_LOGI(FNAME, "CAN bus selftest");
     driverInstall(TWAI_MODE_NO_ACK, CanSpeed::CAN_SPEED_1MBIT);
-    // driverInstall(TWAI_MODE_LISTEN_ONLY, CanSpeed::CAN_SPEED_1MBIT);
     
     bool res = false;
     int id = CANTEST_ID; // todo find some better idea to splatter bytes on the bus for a test
-    twai_clear_receive_queue();
     for (int i = 0; i < 3; i++)
     {
         char tx[10] = {"1827364"};
         int len = strlen(tx);
         ESP_LOGI(FNAME, "strlen %d", len);
         twai_clear_receive_queue(); // there might be data from a remote device
+        vTaskDelay(pdMS_TO_TICKS(2)); // unfortiunatly needed here, otherwise the check does not succeeed
+        
         if ( ! sendData(id, tx, len, 1) ) {
             ESP_LOGW(FNAME, "CAN bus selftest TX FAILED");
         }
