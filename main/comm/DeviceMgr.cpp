@@ -343,15 +343,13 @@ void relMessage(Message *msg)
 
 bool Send(Message* msg)
 {
-    if ( ItfSendQueue ) {
-        if ( pdTRUE != xQueueSend( ItfSendQueue, (void * ) &msg, (TickType_t)0 ) ) {
-            // drop it
-            ESP_LOGW(FNAME, "Dropped message to %d", msg->target_id);
-            MP.recycleMsg(msg);
-        }
-        return true;
+    if ( pdTRUE != xQueueSend( ItfSendQueue, (void * ) &msg, portMAX_DELAY ) ) { // pdMS_TO_TICKS(50) ) ) {
+        // drop it
+        ESP_LOGW(FNAME, "Dropped message to %d", msg->target_id);
+        MP.recycleMsg(msg);
+        return false;
     }
-    return false;
+	return true;
 }
 
 } // namespace
