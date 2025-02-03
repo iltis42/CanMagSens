@@ -184,7 +184,7 @@ bool RegQuery::sendRegistrationQuery()
 {
     Message* msg = newMessage();
 
-    msg->buffer = "$PJPREG ";
+    msg->buffer = "$PJPREG, ";
     msg->buffer += Q_TOKEN;
     msg->buffer += ", MAGSENS\r\n";
     ESP_LOGI(FNAME, "MS send request: %s", msg->buffer.c_str());

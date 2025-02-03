@@ -86,7 +86,7 @@ datalink_action_t MagSens::nextByte(const char c)
     case COMPLETE:
     {
         _sm._state = START_TOKEN; // restart parsing
-        ESP_LOGI(FNAME, "Msg complete %s", _sm._frame.c_str());
+        ESP_LOGD(FNAME, "Msg complete %s", _sm._frame.c_str());
         switch (_sm._frame[4]) {
             case 'H':
                 Version();
@@ -117,47 +117,64 @@ datalink_action_t MagSens::nextByte(const char c)
 
 datalink_action_t MagSens::nextStreamChunk(const char *cptr, int count)
 {
+    if ( _bytesReceived == 0 ) {
+        // Sync to the 0xe9 start of an binary image
+        while ( *cptr != 0xe9 && count > 0 ) {
+            cptr++;
+            count--;
+        }
+        if ( count == 0 ) {
+            return NOACTION;
+        }
+        ESP_LOGI(FNAME, "Synchronized to update start.");
+    }
     if ( _updateHandle ) {
         if ( _buff_fill + count > _updPackSize ) {
-            _packEnum++;
-            if ( esp_ota_write(_updateHandle, _uptBuffer, _buff_fill) ) {
-                confirmPacket(_packEnum);
-            }
+            ESP_LOGI(FNAME, "received %d", _bytesReceived);
+            esp_ota_write(_updateHandle, _uptBuffer, _buff_fill);
             _buff_fill = 0;
         }
+        _packEnum++;
+        if ( _bytesReceived+count > _updPackSize ) {
+            confirmPacket(_packEnum);
+            _packEnum++;
+        }
+        // if ( _bytesReceived == 0 ) {
+		//     ESP_LOGI(FNAME, "First 8 bytes");
+		//     ESP_LOG_BUFFER_HEX(FNAME, cptr, std::min(100, count));
+        // }
+
         memcpy(_uptBuffer+_buff_fill, cptr, count);
         _buff_fill += count;
         _bytesReceived += count;
-        if ( (_bytesReceived % 300) == 0 ) {
-            ESP_LOGI(FNAME, "received %d", _bytesReceived);
-        }
-    }
-    if ( _bytesReceived >= _updateSize ) {
-        ESP_LOGI(FNAME, "Received complete update.");
-        if ( _buff_fill > 0 ) {
-            esp_ota_write(_updateHandle, _uptBuffer, _buff_fill);
-        }
-        if (esp_ota_end(_updateHandle) == ESP_OK)
-        {
-            _updateHandle = 0;
-            // Lets update the partition
-            if (esp_ota_set_boot_partition(_updatePartition) == ESP_OK)
-            {
-                const esp_partition_t *boot_partition = esp_ota_get_boot_partition();
 
-                ESP_LOGI(FNAME, "Next boot partition subtype %d at offset 0x%x", boot_partition->subtype, boot_partition->address);
-
+        if ( _bytesReceived >= _updateSize ) {
+            ESP_LOGI(FNAME, "Received complete update.");
+            if ( _buff_fill > 0 ) {
+                esp_ota_write(_updateHandle, _uptBuffer, _buff_fill);
             }
-            else
+            if (esp_ota_end(_updateHandle) == ESP_OK)
             {
-                ESP_LOGE(FNAME, "\r\n\r\n !!! Flashed Error !!!\r\n");
+                _updateHandle = 0;
+                // Lets update the partition
+                if (esp_ota_set_boot_partition(_updatePartition) == ESP_OK)
+                {
+                    const esp_partition_t *boot_partition = esp_ota_get_boot_partition();
+
+                    ESP_LOGI(FNAME, "Next boot partition subtype %d at offset 0x%x", boot_partition->subtype, (unsigned int)(boot_partition->address));
+
+                }
+                else
+                {
+                    ESP_LOGE(FNAME, "\r\n\r\n !!! Flashed Error !!!\r\n");
+                }
             }
+            ESP_LOGI(FNAME, "rebooting ..");
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            esp_restart();
+            // _binary = false;
+            // return GO_NMEA;
         }
-        ESP_LOGI(FNAME, "rebooting ..");
-        delay(1000);
-        esp_restart();
-        // _binary = false;
-        // return GO_NMEA;
     }
     return NOACTION;
 }
@@ -204,17 +221,18 @@ void MagSens::prepareUpdate()
     int pos = 5;
     _updateSize = std::stoi(NMEA::extractWord(_sm._frame, pos));
     _updPackSize = std::stoi(NMEA::extractWord(_sm._frame, pos));
-    ESP_LOGI(FNAME,"PMS Update size %d", _updateSize);
+    ESP_LOGI(FNAME,"PMS Update size %d/%d", _updateSize, _updPackSize);
 
     // Init the update
     _updatePartition = esp_ota_get_next_update_partition(NULL);
     ESP_LOGI(FNAME, "Next update prt.: %p", _updatePartition);
-    _packEnum = 0;
+    _packEnum = 1;
     _bytesReceived = 0;
     _buff_fill = 0;
     esp_err_t res = esp_ota_begin(_updatePartition, _updateSize, &_updateHandle);
     if (res == ESP_OK) {
         _uptBuffer = (char *)malloc(_updPackSize);
+        ESP_LOGI(FNAME, "Have buffer: %p", _uptBuffer);
     }
     else {
         ESP_LOGE(FNAME, "Failed to initiate update: %s", esp_err_to_name(res));
@@ -229,7 +247,7 @@ void MagSens::confirmPacket(int nr)
 {
     // $PMSC, <enum>\r\n
     Message* msg = newMessage();
-    ESP_LOGI(FNAME,"PMS confirm to did%D - %d", msg->target_id, nr);
+    ESP_LOGI(FNAME,"PMS confirm to did%d - %d", msg->target_id, nr);
 
     msg->buffer = "$PMSC, " + std::to_string(nr) + "\r\n";
     DEV::Send(msg);
