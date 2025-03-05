@@ -29,7 +29,7 @@ public:
     bool sendRegistrationQuery();
 
     // Clock tick callback
-    void tick() override;
+    bool tick() override;
 
 private:
     // Actions on commands

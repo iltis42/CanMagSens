@@ -108,3 +108,4 @@ void InterfaceCtrl::DeleteAllDataLinks()
     }
     _dlink.clear();
 }
+

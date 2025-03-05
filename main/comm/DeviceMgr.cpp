@@ -40,7 +40,7 @@ static RoutingMap Routes = {
 class DmyItf final : public InterfaceCtrl
 {
 public:
-    const char* getStringId() const override { return "DMY"; }
+    const char* getStringId() const override { return "NUL"; }
     void ConfigureIntf(int cfg) override {}
     int Send(const char *msg, int &len, int port=0) { return 0; }
 };
@@ -76,7 +76,7 @@ void IRAM_ATTR TransmitTask(void *arg)
 
 DeviceManager::DeviceManager()
 {
-    ItfSendQueue = xQueueCreate( 20, sizeof(Message*) );
+    ItfSendQueue = xQueueCreate( MSG_POOL_SIZE+1, sizeof(Message*) );
     
 }
 
@@ -343,13 +343,14 @@ void relMessage(Message *msg)
 
 bool Send(Message* msg)
 {
-    if ( pdTRUE != xQueueSend( ItfSendQueue, (void * ) &msg, portMAX_DELAY ) ) { // pdMS_TO_TICKS(50) ) ) {
+    if ( pdTRUE != xQueueSend( ItfSendQueue, (void * ) &msg, portMAX_DELAY ) ) {
         // drop it
         ESP_LOGW(FNAME, "Dropped message to %d", msg->target_id);
         MP.recycleMsg(msg);
         return false;
     }
-	return true;
+    return true;
 }
 
 } // namespace
+

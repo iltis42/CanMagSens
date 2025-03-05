@@ -56,7 +56,7 @@ public:
 
     virtual InterfaceId getId() const { return NO_PHY; }
     virtual const char* getStringId() const { return ""; }
-    // Choose from an enumerated set of configurations, -1: OFF; 0: as is; 1,2,3..: load a preset profile 
+    // Choose from an enumerated set of configurations, -1: nvs default; 0,1,2,3..: load a preset profile 
     virtual void ConfigureIntf(int cfg) = 0;
     // if blocked returns number of ms for next possible invocation, len might be reduced by # bytes that fit into send buffers
     virtual int Send(const char *msg, int &len, int port=0) = 0;
