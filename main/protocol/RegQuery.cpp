@@ -25,7 +25,7 @@
 extern InterfaceCtrl* CAN;
 
 
-// The CAn device regitration query protocol. Those commands/queries are supported:
+// The CAN device regitration query protocol. Those commands/queries are supported:
 //
 // - Registration query: Send a request to a potential peer on the bus grabbing the master role,
 //      and deleivers the expected registration response. Until a peer responds the drive will continue sending a query 
@@ -44,10 +44,12 @@ extern InterfaceCtrl* CAN;
 //      requesting.
 //   $PJPREG, <token>, <protocol type>\r\n
 //
-// The expected master response
+// The expected master message/response
 // - Registration query accepted: A master respons with the query token, a drive id to listen, and a master id to respond messages to.
 //   $PJMACC, <token>, <drive id>, <master id>*<CRC>\r\n
 //
+// - Re-registration broadcast: Triggers a new registration cycle from devices.
+//   $PJMLOR\r\n
 
 RegQuery::RegQuery(int mp, ProtocolState &sm, DataLink &dl)
   : ProtocolItf(DeviceId::MASTER_DEV, mp, sm, dl),
@@ -127,6 +129,12 @@ datalink_action_t RegQuery::nextByte(const char c)
         if ( _sm._frame.compare(4, 3, "ACC") == 0 ) {
             ret = registration();
         }
+        else if ( _sm._frame.compare(4, 3, "LOR") == 0 ) {
+            // restart registration loop
+            _nr_trials = 0;
+            Clock::start(this);
+            tick(); // first trial
+        }
         else if ( _sm._frame.compare(4, 3, "NAC") == 0 ) {
             // lol
             ESP_LOGI(FNAME, "Received not accepted");
@@ -191,12 +199,11 @@ bool RegQuery::sendRegistrationQuery()
     return DEV::Send(msg);
 }
 
-void RegQuery::tick()
+bool RegQuery::tick()
 {
     if ( _nr_trials++ < MAX_NR_TRIALS ) {
         sendRegistrationQuery();
+      return false;
     }
-    else {
-        Clock::stop(this);
-    }
+    return true;
 }
