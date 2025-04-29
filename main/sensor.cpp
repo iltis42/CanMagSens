@@ -31,6 +31,7 @@
 
 I2C_t& i2c_0 = i2c0;  // i2c0 or i2c1
 
+// There is only one such thing on this little device
 MagSens* MAG = nullptr; // set when the version 2 can protocol is used
 
 static int msgsent = 0;
@@ -184,23 +185,27 @@ extern "C" void  app_main(void)
 			int16_t &x=data[0], &y=data[1], &z=data[2];
 			if( magsens->rawHeading( x,y,z) ){
 				bool can_ok = false;
-				if ( stream_status == RAW_STREAM ) {
+				if ( ! MAG ) {
 					// legacy data stream
 					Message *msg = DEV::acqMessage(MASTER_DEV, MagSens::MAGSTREAM_ID);
 					msg->buffer.assign((char *)(data), 6);
 					can_ok = DEV::Send(msg);
 				}
-				// else if ( stream_status == CALIBRATED ) {
-				// 	float data[3];
-				// 	float &xf=data[0], &yf=data[1], &zf=data[2];
-				// 	xf = (x - x_bias) * x_scale;
-				// 	yf = (y - y_bias) * y_scale;
-				// 	zf = (z - z_bias) * z_scale;
-				// 	payload = 8;
-				// 	can_ok = CAN->Send( (char *)data, payload, MagSens::MAGSTREAM_ID );
-				// 	payload = 4;
-				// 	can_ok += CAN->Send( (char *)&zf, payload, MagSens::MAGSTREAM_ID );
-				// }
+				else {
+					if ( stream_status == RAW_STREAM ) {
+						// Send raw data
+						MAG->streamData(x, y, z);
+					}
+					else {
+						// Send calibrated data
+						// Apply the calibration
+						float xf, yf, zf;
+						xf = (x - x_bias) * x_scale;
+						yf = (y - y_bias) * y_scale;
+						zf = (z - z_bias) * z_scale;
+						MAG->streamData(xf, yf, zf);
+					}
+				}
 				if( can_ok == 0 ) {
 					msgsent++;
 					if( !(msgsent%200) ) {
