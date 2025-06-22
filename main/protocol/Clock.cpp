@@ -18,6 +18,8 @@ esp_timer_handle_t Clock::_clock_timer = nullptr;
 
 static volatile unsigned long msec_counter = 0;
 
+constexpr int ESP32C3_TICKBASE = 100; // A little bit magic here, should be 1000 according to manuals
+
 // Simple fix number of slots registry
 static std::set<Clock_I*> clock_registry;
 
@@ -25,7 +27,7 @@ static std::set<Clock_I*> clock_registry;
 static void IRAM_ATTR clock_timer_sr(std::set<Clock_I*> *registry)
 {
     // be in sync with millis, but sparse
-    msec_counter = esp_timer_get_time() / 1000;
+    msec_counter = esp_timer_get_time() / ESP32C3_TICKBASE;
     for (auto it = registry->begin(); it != registry->end(); ) {
         if ((*it)->myTurn()) {
             if ((*it)->tick()) {
@@ -52,7 +54,7 @@ Clock::Clock()
 
         };
         esp_timer_create(&t_args, &_clock_timer);
-        esp_timer_start_periodic(_clock_timer, TICK_ATOM * 1000);
+        esp_timer_start_periodic(_clock_timer, TICK_ATOM * ESP32C3_TICKBASE);
         clock_registry.clear();
     }
 }
@@ -62,7 +64,7 @@ void Clock::start(Clock_I *cb)
 {
     esp_timer_stop(_clock_timer);
     clock_registry.insert(cb);
-    esp_timer_start_periodic(_clock_timer, TICK_ATOM * 1000);
+    esp_timer_start_periodic(_clock_timer, TICK_ATOM * ESP32C3_TICKBASE);
 }
 void Clock::stop(Clock_I *cb)
 {
@@ -71,7 +73,7 @@ void Clock::stop(Clock_I *cb)
     if ( it != clock_registry.end() ) {
         clock_registry.erase(it);
     }
-    esp_timer_start_periodic(_clock_timer, TICK_ATOM * 1000);
+    esp_timer_start_periodic(_clock_timer, TICK_ATOM * ESP32C3_TICKBASE);
 }
 
 unsigned long Clock::getMillis()
@@ -80,5 +82,5 @@ unsigned long Clock::getMillis()
 }
 int Clock::getSeconds()
 {
-    return static_cast<int>(msec_counter / 1000);
+    return static_cast<int>(msec_counter / ESP32C3_TICKBASE);
 }
