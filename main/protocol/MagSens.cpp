@@ -15,6 +15,7 @@
 #include "Version.h"
 #include "logdef.h"
 
+
 // MagSens NMEA protocol is just a simple one. Those queries are supported:
 // - Hello and version query:
 //   $PMSH\r\n
@@ -31,13 +32,16 @@
 // - Anounce firmware update:
 //   $PMSU, <length>, <packet_size>*<CRC>\r\n
 //
-// The MagSens responses
+////
+// The MagSens responses, or own messages
 // - Version:
 //   $PMSV, <release_number>, <build_dateandtime>\r\n
 //
 // - Firmware packet confirmation:
 //   $PMSC, <enum>\r\n
-
+//
+// - Stream data:
+//   $PMMD, <stream_type>, <data>\r\n
 datalink_action_t MagSens::nextByte(const char c)
 {
     int pos = _sm._frame.size() - 1; // c already in the buffer
@@ -184,6 +188,28 @@ datalink_action_t MagSens::nextStreamChunk(const char *cptr, int count)
     }
     return NOACTION;
 }
+
+// Stream raw data
+//   $PMMD, <stream_type>, <data>\r\n
+bool MagSens::streamData(int16_t x, int16_t y, int16_t z)
+{
+    // ESP_LOGI(FNAME,"PMMD Stream");
+    Message* msg = newMessage();
+
+    msg->buffer = "$PMMD,r," + std::to_string(x) + ","+ std::to_string(y) + "," + std::to_string(z) + "\r\n";
+
+    return DEV::Send(msg);
+}
+bool MagSens::streamData(float x, float y, float z)
+{
+    // ESP_LOGI(FNAME,"PMMD Stream");
+    Message* msg = newMessage();
+
+    msg->buffer = "$PMMD,c," + std::to_string(x) + ","+ std::to_string(y) + "," + std::to_string(z) + "\r\n";
+
+    return DEV::Send(msg);
+}
+
 
 void MagSens::Version()
 {

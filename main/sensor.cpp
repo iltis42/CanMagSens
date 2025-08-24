@@ -10,6 +10,7 @@
 #include "QMC5883L.h"
 #include "QMC6310U.h"
 #include "ESP32NVS.h"
+#include "logdef.h"
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -18,7 +19,6 @@
 #include <esp_flash.h>
 #include <esp_chip_info.h>
 #include <driver/gpio.h>
-#include <logdef.h>
 
 #include <I2Cbus.hpp>
 #include <driver/gpio.h>
@@ -31,6 +31,7 @@
 
 I2C_t& i2c_0 = i2c0;  // i2c0 or i2c1
 
+// There is only one such thing on this little device
 MagSens* MAG = nullptr; // set when the version 2 can protocol is used
 
 static int msgsent = 0;
@@ -39,7 +40,7 @@ mag_state_t stream_status = RAW_STREAM;
 // MAIN
 extern "C" void  app_main(void)
 {
-	static Clock my_clock;
+	Clock my_clock;
 
 	ESP_LOGI(FNAME,"app_main" );
 	ESP_LOGI(FNAME,"Now init all Setup elements");
@@ -53,7 +54,7 @@ extern "C" void  app_main(void)
 			(chip_info.features & CHIP_FEATURE_BT) ? "/BT" : "",
 					(chip_info.features & CHIP_FEATURE_BLE) ? "/BLE" : "");
 	ESP_LOGI( FNAME,"Silicon revision %d, ", chip_info.revision);
-	
+
 	uint32_t size = 0;
 	esp_flash_get_size(nullptr, &size);
 	ESP_LOGI( FNAME,"%dMB %s flash\n", (int)size / (1024 * 1024),
@@ -75,7 +76,7 @@ extern "C" void  app_main(void)
 	ESP_LOGI(FNAME,"Now start CAN bus selftest" );
 
 
-	// Start CAN 
+	// Start CAN
 	CAN = new CANbus(GPIO_NUM_1, GPIO_NUM_3);
 	if( ! CAN->begin() ) {
 		ESP_LOGE(FNAME,"CAN bus selftest failed" );
@@ -98,7 +99,7 @@ extern "C" void  app_main(void)
 	DeviceManager* dm = DeviceManager::Instance();
 	dm->addDevice(MASTER_DEV, REGISTRATION_P, CAN_REG_PORT, CAN_REG_PORT, CAN_BUS);
 
-	// Find the proper mag sensor chip 
+	// Find the proper mag sensor chip
 	QMCbase *magsens;
 	while ( 1 ) {
 		magsens = new QMC5883L( QMCbase::ODR_50Hz, QMC5883L::RANGE_2GAUSS, QMC5883L::OSR_512, &i2c_0 );
@@ -178,29 +179,33 @@ extern "C" void  app_main(void)
 			esp_err_t err = esp_light_sleep_start();
 		}
 		wake_time = esp_timer_get_time();
-		
+
 		if ( stream_status != STREAM_OFF ) {
 			int16_t data[3];
 			int16_t &x=data[0], &y=data[1], &z=data[2];
 			if( magsens->rawHeading( x,y,z) ){
 				bool can_ok = false;
-				if ( stream_status == RAW_STREAM ) {
+				if ( ! MAG ) {
 					// legacy data stream
 					Message *msg = DEV::acqMessage(MASTER_DEV, MagSens::MAGSTREAM_ID);
 					msg->buffer.assign((char *)(data), 6);
 					can_ok = DEV::Send(msg);
 				}
-				// else if ( stream_status == CALIBRATED ) {
-				// 	float data[3];
-				// 	float &xf=data[0], &yf=data[1], &zf=data[2];
-				// 	xf = (x - x_bias) * x_scale;
-				// 	yf = (y - y_bias) * y_scale;
-				// 	zf = (z - z_bias) * z_scale;
-				// 	payload = 8;
-				// 	can_ok = CAN->Send( (char *)data, payload, MagSens::MAGSTREAM_ID );
-				// 	payload = 4;
-				// 	can_ok += CAN->Send( (char *)&zf, payload, MagSens::MAGSTREAM_ID );
-				// }
+				else {
+					if ( stream_status == RAW_STREAM ) {
+						// Send raw data
+						MAG->streamData(x, y, z);
+					}
+					else {
+						// Send calibrated data
+						// Apply the calibration
+						float xf, yf, zf;
+						xf = (x - x_bias) * x_scale;
+						yf = (y - y_bias) * y_scale;
+						zf = (z - z_bias) * z_scale;
+						MAG->streamData(xf, yf, zf);
+					}
+				}
 				if( can_ok == 0 ) {
 					msgsent++;
 					if( !(msgsent%200) ) {

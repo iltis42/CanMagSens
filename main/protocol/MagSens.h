@@ -15,34 +15,38 @@
 class MagSens final : public ProtocolItf
 {
 public:
-	static constexpr int MAGCTRL_ID   = 0x30;
-	static constexpr int MAGSTREAM_ID = 0x31;
+    static constexpr int MAGSTREAM_ID = 0x31; // legacy bin stream port
 
     MagSens(int mp, ProtocolState &sm, DataLink &dl) : ProtocolItf(DeviceId::MASTER_DEV, mp, sm, dl) {}
-	virtual ~MagSens() {}
+    virtual ~MagSens() {}
 
 public:
-	ProtocolType getProtocolId() override { return MAGSENS_P; }
-	datalink_action_t nextByte(const char c) override;
-	datalink_action_t nextStreamChunk(const char *cptr, int count) override;
-	bool isBinary() const override { return _binary; }
+    ProtocolType getProtocolId() override { return MAGSENS_P; }
+    datalink_action_t nextByte(const char c) override;
+    datalink_action_t nextStreamChunk(const char *cptr, int count) override;
+    bool isBinary() const override { return _binary; }
+
+    // send the mag data
+    bool streamData(int16_t x, int16_t y, int16_t z);
+    bool streamData(float x, float y, float z);
 
 private:
-	void Version();
-	void parseCalibration();
-	void startStream();
-	void killStream();
-	void prepareUpdate();
+    void Version();
+    void parseCalibration();
+    void startStream();
+    void killStream();
+    void prepareUpdate();
     void confirmPacket(int nr);
     // firmware update
     int _updateSize = 0;
-	int _updPackSize = 0;
-	int _bytesReceived = 0;
-	int _packEnum = 0;
-	char *_uptBuffer = nullptr;
-	int _buff_fill = 0;
-	const esp_partition_t *_updatePartition = nullptr;
-	esp_ota_handle_t _updateHandle = 0;
-	bool _binary = false;
+    int _updPackSize = 0;
+    int _bytesReceived = 0;
+    int _packEnum = 0;
+    char *_uptBuffer = nullptr;
+    int _buff_fill = 0;
+    const esp_partition_t *_updatePartition = nullptr;
+    esp_ota_handle_t _updateHandle = 0;
+    bool _binary = false;
 };
 
+// export MagSens *MAG;
